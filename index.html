@@ -270,16 +270,16 @@
                 <button class="team-filter-item active" data-team="All">
                     <span class="team-filter-all">All</span>
                 </button>
-                <button class="team-filter-item" data-team="MI"><img alt="MI" src="./images_final/MI.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>MI</span>';"/></button>
-                <button class="team-filter-item" data-team="CSK"><img alt="CSK" src="./images_final/CSK.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>CSK</span>';"/></button>
-                <button class="team-filter-item" data-team="RCB"><img alt="RCB" src="./images_final/RCB.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>RCB</span>';"/></button>
-                <button class="team-filter-item" data-team="KKR"><img alt="KKR" src="./images_final/KKR.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>KKR</span>';"/></button>
-                <button class="team-filter-item" data-team="SRH"><img alt="SRH" src="./images_final/SRH.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>SRH</span>';"/></button>
-                <button class="team-filter-item" data-team="RR"><img alt="RR" src="./images_final/RR.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>RR</span>';"/></button>
-                <button class="team-filter-item" data-team="GT"><img alt="GT" src="./images_final/GT.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>GT</span>';"/></button>
-                <button class="team-filter-item" data-team="DC"><img alt="DC" src="./images_final/DC.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>DC</span>';"/></button>
-                <button class="team-filter-item" data-team="PBKS"><img alt="PBKS" src="./images_final/PBKS.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>PBKS</span>';"/></button>
-                <button class="team-filter-item" data-team="LSG"><img alt="LSG" src="./images_final/LSG.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>LSG</span>';"/></button>
+                <button class="team-filter-item" data-team="MI"><img alt="MI" src="./MI.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>MI</span>';"/></button>
+                <button class="team-filter-item" data-team="CSK"><img alt="CSK" src="./CSK.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>CSK</span>';"/></button>
+                <button class="team-filter-item" data-team="RCB"><img alt="RCB" src="./RCB.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>RCB</span>';"/></button>
+                <button class="team-filter-item" data-team="KKR"><img alt="KKR" src="./KKR.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>KKR</span>';"/></button>
+                <button class="team-filter-item" data-team="SRH"><img alt="SRH" src="./SRH.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>SRH</span>';"/></button>
+                <button class="team-filter-item" data-team="RR"><img alt="RR" src="./RR.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>RR</span>';"/></button>
+                <button class="team-filter-item" data-team="GT"><img alt="GT" src="./GT.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>GT</span>';"/></button>
+                <button class="team-filter-item" data-team="DC"><img alt="DC" src="./DC.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>DC</span>';"/></button>
+                <button class="team-filter-item" data-team="PBKS"><img alt="PBKS" src="./PBKS.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>PBKS</span>';"/></button>
+                <button class="team-filter-item" data-team="LSG"><img alt="LSG" src="./LSG.png" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'team-filter-all\'>LSG</span>';"/></button>
             </div>
         </section>
         <div class="px-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="upcomingMatchesContainer">
@@ -638,8 +638,8 @@
         const totalMatches = totalA + totalB;
 
         document.getElementById('h2hModalTitle').textContent = `${abbrA} vs ${abbrB} — Head to Head`;
-        document.getElementById('h2hImgA').src = `./images_final/${abbrA}.png`;
-        document.getElementById('h2hImgB').src = `./images_final/${abbrB}.png`;
+        document.getElementById('h2hImgA').src = `./${abbrA}.png`;
+        document.getElementById('h2hImgB').src = `./${abbrB}.png`;
         document.getElementById('h2hNameA').textContent = abbrA;
         document.getElementById('h2hNameB').textContent = abbrB;
         document.getElementById('h2hScoreBig').textContent = `${totalA} - ${totalB}`;
@@ -699,7 +699,7 @@
                     <div class="flex flex-col items-center gap-1.5 w-1/3 group has-stats cursor-pointer" onclick="showH2HModal('${m.teamA}', '${m.teamB}')">
                         <div class="relative">
                             <div class="w-14 h-14 ${bgA} rounded-full flex items-center justify-center p-2 border-2 ${colorA} ${glowA} transition-all duration-300">
-                                <img alt="${abbrA}" class="w-full h-full object-contain relative z-10" src="./images_final/${abbrA}.png" onerror="this.style.display='none'; this.parentElement.textContent='${abbrA}';">
+                                <img alt="${abbrA}" class="w-full h-full object-contain relative z-10" src="./${abbrA}.png" onerror="this.style.display='none'; this.parentElement.textContent='${abbrA}';">
                             </div>
                             ${checkA}
                             <div class="absolute -top-1 -right-1 themed-card rounded-full p-0.5 shadow-lg z-10">
@@ -720,7 +720,7 @@
                     <div class="flex flex-col items-center gap-1.5 w-1/3 group has-stats cursor-pointer" onclick="showH2HModal('${m.teamA}', '${m.teamB}')">
                         <div class="relative">
                             <div class="w-14 h-14 ${bgB} rounded-full flex items-center justify-center p-2 border-2 ${colorB} ${glowB} transition-all duration-300">
-                                <img alt="${abbrB}" class="w-full h-full object-contain relative z-10" src="./images_final/${abbrB}.png" onerror="this.style.display='none'; this.parentElement.textContent='${abbrB}';">
+                                <img alt="${abbrB}" class="w-full h-full object-contain relative z-10" src="./${abbrB}.png" onerror="this.style.display='none'; this.parentElement.textContent='${abbrB}';">
                             </div>
                             ${checkB}
                             <div class="absolute -top-1 -right-1 themed-card rounded-full p-0.5 shadow-lg z-10">
