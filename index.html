@@ -424,6 +424,32 @@
     </div>
 </div>
 
+<!-- ═══════════════ PREDICTION DETAILS MODAL ═══════════════ -->
+<div class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center px-4" id="predictionModal" onclick="if(event.target===this||event.target.classList.contains('bg-brand-darker/90')) closePredictionModal()">
+    <div class="fixed inset-0 bg-brand-darker/90 backdrop-blur-md" onclick="closePredictionModal()"></div>
+    <div class="modal-inner relative bg-brand-muted border border-brand-overlay rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+        <div class="p-5 border-b border-brand-overlay shrink-0">
+            <h3 class="text-sm font-bold text-center text-brand-text uppercase tracking-wider mb-2">Match Predictions</h3>
+            <div id="predictionModalTitle" class="text-lg font-black text-center text-brand-primary"></div>
+        </div>
+        <div class="p-0 overflow-y-auto no-scrollbar pb-2 flex-1 relative bg-brand-surface/30">
+            <table class="data-table whitespace-nowrap w-full text-sm">
+                <thead class="sticky top-0 bg-brand-muted z-10">
+                    <tr>
+                        <th class="text-left font-bold text-brand-text py-3 px-5 border-b border-brand-overlay uppercase text-[10px] tracking-wider bg-brand-muted">Player</th>
+                        <th class="text-right font-bold text-brand-text py-3 px-5 border-b border-brand-overlay uppercase text-[10px] tracking-wider bg-brand-muted">Prediction</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionModalBody">
+                </tbody>
+            </table>
+        </div>
+        <div class="p-4 border-t border-brand-overlay shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-20 bg-brand-muted">
+             <button class="w-full bg-brand-accent hover:bg-orange-600 text-brand-darker font-bold py-3 rounded-xl transition-all text-sm" onclick="closePredictionModal()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
 <script>
     // ─── GLOBALS ──────────────────────────
@@ -432,6 +458,8 @@
     let myPicks = [];
     let h2hData = {};
     let activeFilter = 'All';
+    let globalAllPicks = [];
+    let globalAllPlayers = new Set();
 
     const TEAM_ABBR = {
         'Mumbai Indians': 'MI', 'Chennai Super Kings': 'CSK', 'Kolkata Knight Riders': 'KKR',
@@ -496,12 +524,15 @@
     }
 
     async function fetchMyPicks() {
-        if (!currentUser) return;
         try {
             const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
             const data = await res.json();
             const allPicks = data.record.picks || [];
-            myPicks = allPicks.filter(p => p.userName === currentUser);
+            globalAllPicks = allPicks;
+            globalAllPlayers = new Set(allPicks.map(p => p.userName));
+            if (currentUser) {
+                myPicks = allPicks.filter(p => p.userName === currentUser);
+            }
         } catch (err) { console.error(err); }
     }
 
@@ -655,6 +686,67 @@
 
     function closeH2HModal() { document.getElementById('h2hModal').classList.remove('active'); }
 
+    // ─── PREDICTION MODAL ──────────────────────────
+    function showPredictionModal(matchId) {
+        const match = scheduleData.find(m => m.id === matchId);
+        if (!match) return;
+        
+        const teamAAbbr = TEAM_ABBR[match.teamA] || match.teamA;
+        const teamBAbbr = TEAM_ABBR[match.teamB] || match.teamB;
+        const winnerAbbr = match.winner ? (TEAM_ABBR[match.winner] || match.winner) : 'TBD';
+        
+        const matchPicks = globalAllPicks.filter(p => p.matchId === matchId);
+        
+        let titleSuffix = '';
+        if (match.winner && globalAllPlayers.size > 0) {
+            const correctPredictors = matchPicks.filter(p => p.team === match.winner).length;
+            const pct = Math.round((correctPredictors / globalAllPlayers.size) * 100);
+            titleSuffix = ` - Winner ${winnerAbbr} - ${pct}% (${correctPredictors}/${globalAllPlayers.size})`;
+        } else if (!match.winner) {
+            const teamAPicks = matchPicks.filter(p => p.team === match.teamA).length;
+            const teamBPicks = matchPicks.filter(p => p.team === match.teamB).length;
+            titleSuffix = ` - (${teamAAbbr} - ${teamAPicks} & ${teamBAbbr} - ${teamBPicks})`;
+        }
+        
+        document.getElementById('predictionModalTitle').textContent = `${teamAAbbr} Vs ${teamBAbbr}${titleSuffix}`;
+        
+        const tbody = document.getElementById('predictionModalBody');
+        
+        if (globalAllPlayers.size === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center py-4 text-brand-text">No predictions available.</td></tr>';
+        } else {
+            const rows = Array.from(globalAllPlayers).map(player => {
+                const pick = matchPicks.find(p => p.userName === player);
+                const pickStr = pick ? (TEAM_ABBR[pick.team] || pick.team) : '-';
+                
+                let textColor = 'text-brand-text';
+                if (pickStr !== '-') {
+                    if (match.winner && pick.team === match.winner) {
+                        textColor = 'text-green-400 font-semibold';
+                    } else if (match.winner && pick.team !== match.winner) {
+                        textColor = 'text-red-400 font-semibold';
+                    } else {
+                        textColor = 'text-brand-primary';
+                    }
+                }
+                
+                return `
+                    <tr class="border-b border-brand-overlay last:border-0 hover:bg-brand-overlay/50 transition-colors">
+                        <td class="py-3 px-5 text-left font-medium text-brand-primary">${player}</td>
+                        <td class="py-3 px-5 text-right ${textColor}">${pickStr}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows.join('');
+        }
+        
+        document.getElementById('predictionModal').classList.add('active');
+    }
+    
+    function closePredictionModal() {
+        document.getElementById('predictionModal').classList.remove('active');
+    }
+
     // ─── RENDER UPCOMING MATCHES ──────────────────────────
     function renderUpcomingMatches() {
         const container = document.getElementById('upcomingMatchesContainer');
@@ -736,26 +828,29 @@
                     </div>
                 </div>
                 <div class="pt-3 border-t border-brand-overlay">
-                    ${existingPick ? `
+                    ${isLocked ? `
+                        <p class="text-[10px] text-center text-brand-text mb-2 uppercase tracking-wider font-semibold">🔒 Predictions Locked</p>
+                        <button class="w-full bg-brand-overlay hover:bg-brand-overlay2 border border-brand-overlay text-brand-primary py-2 rounded-lg font-bold text-xs transition-all shadow-md" onclick="showPredictionModal('${m.id}')">Check predictions</button>
+                    ` : (existingPick ? `
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-[9px] text-brand-text uppercase tracking-wider font-semibold">Your Prediction</p>
-                            <p class="text-[9px] text-brand-text/60">${isLocked ? '🔒 Locked' : 'Update until kickoff'}</p>
+                            <p class="text-[9px] text-brand-text/60">Update until kickoff</p>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <button class="${pickValue === m.teamA ? 'bg-brand-accent text-brand-darker border-brand-accent' : 'bg-brand-overlay hover:bg-brand-accent/20 border-brand-overlay hover:border-brand-accent text-brand-text'} border py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-all" onclick="submitPickDirect('${m.id}', '${m.teamA}')" ${isLocked ? 'disabled' : ''}>
+                            <button class="${pickValue === m.teamA ? 'bg-brand-accent text-brand-darker border-brand-accent' : 'bg-brand-overlay hover:bg-brand-accent/20 border-brand-overlay hover:border-brand-accent text-brand-text'} border py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-all" onclick="submitPickDirect('${m.id}', '${m.teamA}')">
                                 ${pickValue === m.teamA ? '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>' : ''} ${abbrA}
                             </button>
-                            <button class="${pickValue === m.teamB ? 'bg-brand-accent text-brand-darker border-brand-accent' : 'bg-brand-overlay hover:bg-brand-accent/20 border-brand-overlay hover:border-brand-accent text-brand-text'} border py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-all" onclick="submitPickDirect('${m.id}', '${m.teamB}')" ${isLocked ? 'disabled' : ''}>
+                            <button class="${pickValue === m.teamB ? 'bg-brand-accent text-brand-darker border-brand-accent' : 'bg-brand-overlay hover:bg-brand-accent/20 border-brand-overlay hover:border-brand-accent text-brand-text'} border py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-all" onclick="submitPickDirect('${m.id}', '${m.teamB}')">
                                 ${pickValue === m.teamB ? '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>' : ''} ${abbrB}
                             </button>
                         </div>
                     ` : `
-                        <p class="text-[10px] text-center text-brand-text mb-2 uppercase tracking-wider font-semibold">${isLocked ? '🔒 Predictions Locked' : 'Who will win?'}</p>
+                        <p class="text-[10px] text-center text-brand-text mb-2 uppercase tracking-wider font-semibold">Who will win?</p>
                         <div class="grid grid-cols-2 gap-2">
-                            <button class="bg-brand-overlay hover:bg-brand-accent/20 border border-brand-overlay hover:border-brand-accent py-2 rounded-lg font-medium text-xs transition-all" onclick="submitPickDirect('${m.id}', '${m.teamA}')" ${isLocked ? 'disabled' : ''}>Predict ${abbrA}</button>
-                            <button class="bg-brand-overlay hover:bg-brand-accent/20 border border-brand-overlay hover:border-brand-accent py-2 rounded-lg font-medium text-xs transition-all" onclick="submitPickDirect('${m.id}', '${m.teamB}')" ${isLocked ? 'disabled' : ''}>Predict ${abbrB}</button>
+                            <button class="bg-brand-overlay hover:bg-brand-accent/20 border border-brand-overlay hover:border-brand-accent py-2 rounded-lg font-medium text-xs transition-all" onclick="submitPickDirect('${m.id}', '${m.teamA}')">Predict ${abbrA}</button>
+                            <button class="bg-brand-overlay hover:bg-brand-accent/20 border border-brand-overlay hover:border-brand-accent py-2 rounded-lg font-medium text-xs transition-all" onclick="submitPickDirect('${m.id}', '${m.teamB}')">Predict ${abbrB}</button>
                         </div>
-                    `}
+                    `)}
                 </div>
             `;
             container.appendChild(card);
@@ -766,6 +861,17 @@
     // ─── SUBMIT PICK (direct button) ──────────────────────────
     async function submitPickDirect(matchId, team) {
         if (!currentUser) { promptLogin(); return; }
+
+        const match = scheduleData.find(m => m.id === matchId);
+        if (match) {
+            const matchTime = new Date(match.startTimeISO).getTime();
+            const cutoff = matchTime - (30 * 60 * 1000);
+            if (Date.now() >= cutoff) {
+                alert('Predictions are locked for this match!');
+                renderUpcomingMatches();
+                return;
+            }
+        }
 
         try {
             const currentRes = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
@@ -805,11 +911,20 @@
     // ─── COUNTDOWN TIMER ──────────────────────────
     function updateCountdowns() {
         const now = Date.now();
+        let needsRender = false;
+        
         document.querySelectorAll('.countdown').forEach(el => {
             const matchTime = new Date(el.dataset.time).getTime();
             const cutoff = matchTime - (30 * 60 * 1000);
             const diff = cutoff - now;
-            if (diff <= 0) { el.textContent = "00:00:00"; return; }
+            
+            if (diff <= 0) {
+                if (el.textContent !== "00:00:00" && el.textContent !== "...") {
+                    needsRender = true;
+                }
+                el.textContent = "00:00:00";
+                return;
+            }
             const totalMins = Math.floor(diff / 60000);
             if (totalMins > 24 * 60) {
                 const days = Math.floor(totalMins / (24 * 60));
@@ -822,6 +937,10 @@
                 el.textContent = `${h}:${m}:${s}`;
             }
         });
+        
+        if (needsRender) {
+            renderUpcomingMatches();
+        }
     }
 
     // ─── RENDER MY RESULTS ──────────────────────────
@@ -836,12 +955,15 @@
             const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
             const data = await res.json();
             allPicks = data.record.picks || [];
+            globalAllPicks = allPicks;
         } catch (err) {
             console.error('Failed to fetch all picks for Prediction%', err);
+            allPicks = globalAllPicks;
         }
 
         // Get all unique players (anyone who ever made a pick)
         const allPlayers = new Set(allPicks.map(p => p.userName));
+        globalAllPlayers = allPlayers;
         const totalPlayers = allPlayers.size;
 
         const pastMatches = scheduleData.filter(m => m.winner !== null || new Date(m.startTimeISO).getTime() - 30 * 60 * 1000 <= Date.now());
@@ -872,7 +994,7 @@
                     // Players who didn't predict count as wrong (denominator is totalPlayers)
                     const pct = Math.round((correctPredictors / totalPlayers) * 100);
                     const pctColor = pct >= 50 ? 'text-green-400' : 'text-red-400';
-                    predPctHtml = `<span class="${pctColor} font-semibold">${pct}%</span>`;
+                    predPctHtml = `<button class="${pctColor} font-semibold hover:underline cursor-pointer transition-colors px-2 py-1 bg-brand-overlay rounded-lg hover:bg-brand-overlay2" onclick="showPredictionModal('${m.id}')">${pct}%</button>`;
                 }
             }
             return `
