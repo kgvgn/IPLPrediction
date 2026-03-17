@@ -869,6 +869,10 @@
         function switchView(viewName) {
             if (currentUser === 'ADMIN' && !viewName.startsWith('admin')) return;
 
+            // Scroll to top on view change
+            const mainEl = document.querySelector('main');
+            if (mainEl) mainEl.scrollTop = 0;
+
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(`view-${viewName}`).classList.add('active');
 
@@ -960,17 +964,18 @@
 
             if (!name) {
                 hint.textContent = "Enter your name first";
+                loginBtn.textContent = "Login";
                 return;
             }
 
             if (globalUsers[name]) {
                 hint.textContent = "Welcome back! Enter your 4-digit PIN";
-                msg.textContent = "Existing user detected. Please verify your PIN.";
+                msg.textContent = "Please verify your 4-digit PIN to continue.";
                 loginBtn.textContent = "Login";
             } else {
-                hint.textContent = "New user! Set a 4-digit PIN to register";
-                msg.textContent = "Register a new account with a 4-digit PIN.";
-                loginBtn.textContent = "Register Account";
+                hint.innerHTML = `<span class="text-red-400">User not registered!</span>`;
+                msg.innerHTML = `Contact admin <span class="text-brand-accent font-bold">(Gopinadh or Chandrakanth)</span> to get registered and start playing.`;
+                loginBtn.textContent = "Login";
             }
         }
 
@@ -1012,26 +1017,10 @@
                         return;
                     }
                 } else {
-                    // Registration
-                    users[name] = pin;
-                    const updateRes = await fetch(JSONBIN_URL, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                        body: JSON.stringify({ picks: allPicks, users: users })
-                    });
-                    if (!updateRes.ok) {
-                        alert('Failed to register user.');
-                        loginBtn.textContent = originalBtnText;
-                        loginBtn.disabled = false;
-                        return;
-                    }
-                    // If newly registered with 0000 (though unlikely unless admin added), trigger change pin
-                    if (pin === '0000') {
-                        pendingUser = { name, originalPicks: allPicks };
-                        document.getElementById('loginModal').classList.remove('active');
-                        document.getElementById('changePinModal').classList.add('active');
-                        return;
-                    }
+                    alert(`User "${name}" is not registered. Contact admin (Gopinadh or Chandrakanth) to get registered and start playing.`);
+                    loginBtn.textContent = originalBtnText;
+                    loginBtn.disabled = false;
+                    return;
                 }
 
                 currentUser = name;
@@ -1368,7 +1357,7 @@
 
             let html = `
                 <button onclick="resetLeaderboardChart()" 
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-accent bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-brand-darker transition-all hover:scale-105">
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-accent bg-brand-accent/10 text-brand-accent hover:opacity-80 transition-all">
                     <span class="material-symbols-outlined text-[16px]">restart_alt</span>
                     <span class="text-xs font-bold uppercase tracking-widest">Reset All</span>
                 </button>
@@ -1378,11 +1367,10 @@
                 const color = chartUserColors[player];
                 return `
                     <button onclick="toggleChartDataset('${player}')" id="legend-${player}"
-                        class="flex items-center gap-2 px-4 py-2 rounded-full border border-brand-overlay bg-brand-overlay/20 transition-all hover:scale-105 active:scale-95"
-                        data-active="true"
-                        style="border-color: ${color}">
-                        <div class="w-3 h-3 rounded-full shadow-[0_0_8px_${color}]" style="background-color: ${color}"></div>
-                        <span class="text-xs font-black text-brand-primary uppercase tracking-tight">${player}</span>
+                        class="flex items-center gap-2 px-4 py-2 rounded-full border border-brand-overlay bg-brand-overlay/20 transition-all active:bg-brand-overlay/40"
+                        style="border-color: ${color}; -webkit-font-smoothing: antialiased;">
+                        <div class="w-3 h-3 rounded-full shadow-[0_0_5px_${color}]" style="background-color: ${color}"></div>
+                        <span class="text-xs font-bold text-brand-primary uppercase tracking-tight">${player}</span>
                     </button>
                 `;
             }).join('');
