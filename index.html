@@ -81,7 +81,7 @@
       --table-border: rgba(0, 0, 0, 0.06);
       --table-hover: rgba(0, 0, 0, 0.03);
       --card-bg: #FFFFFF;
-      --tooltip-bg: #0F172A;
+      --tooltip-bg: #FFFFFF;
       --modal-backdrop: rgba(0, 0, 0, 0.5);
       --accent: #EA580C;
       --input-bg: #F1F5F9;
@@ -156,6 +156,7 @@
     .stats-tooltip {
       visibility: hidden; opacity: 0;
       transition: opacity 0.2s, visibility 0.2s;
+      border: 1px solid var(--border-color);
     }
     .has-stats:hover .stats-tooltip, .has-stats:focus-within .stats-tooltip {
       visibility: visible; opacity: 1;
@@ -354,10 +355,39 @@
             </div>
         </div>
     </div>
+
+    <!-- ADMIN VIEW -->
+    <div id="view-admin" class="view-section">
+        <section class="px-5 pt-6 pb-4">
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-2xl font-bold">Admin Panel</h2>
+                <button onclick="logoutAdmin()" class="text-xs font-bold text-red-400 uppercase tracking-widest bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20">Logout</button>
+            </div>
+            <p class="text-brand-text text-sm mb-6">Update match winner details.</p>
+            
+            <div class="bg-brand-muted rounded-2xl border border-brand-overlay overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="data-table whitespace-nowrap w-full">
+                        <thead class="bg-brand-darker/50">
+                            <tr>
+                                <th class="!py-4">Match</th>
+                                <th class="!py-4">Venue</th>
+                                <th class="!py-4">Current Winner</th>
+                                <th class="!py-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminMatchesBody">
+                            <!-- JS Injected -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
 </main>
 
 <!-- ═══════════════ BOTTOM NAVIGATION ═══════════════ -->
-<nav class="fixed bottom-0 left-0 right-0 glass-effect border-t border-brand-overlay pb-[env(safe-area-inset-bottom)] pt-3 px-8 flex justify-between items-center z-50">
+<nav class="fixed bottom-0 left-0 right-0 glass-effect border-t border-brand-overlay pb-[env(safe-area-inset-bottom)] pt-3 px-8 flex justify-between items-center z-50" id="bottomNav">
     <a class="bottom-nav-item flex flex-col items-center gap-1 text-brand-accent active" href="#" onclick="switchView('upcoming'); return false;">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
         <span class="text-[10px] font-bold">Matches</span>
@@ -461,6 +491,10 @@
     let globalAllPicks = [];
     let globalAllPlayers = new Set();
 
+    const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/69b51614b7ec241ddc693348';
+    const SCHEDULE_BIN_URL = 'https://api.jsonbin.io/v3/b/69b89f95aa77b81da9eefef2';
+    const MASTER_KEY = '$2a$10$hkFvOh3x6zhiDHHRVZteKOec/i2JSy.JXIX4qMTyYx4BvIs2m8.Fu';
+
     const TEAM_ABBR = {
         'Mumbai Indians': 'MI', 'Chennai Super Kings': 'CSK', 'Kolkata Knight Riders': 'KKR',
         'Sunrisers Hyderabad': 'SRH', 'Royal Challengers Bangalore': 'RCB', 'Gujarat Titans': 'GT',
@@ -490,15 +524,16 @@
         const target = current === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', target);
         localStorage.setItem('ipl_theme', target);
-        const toggleBtn = document.getElementById('themeToggle');
-        if (toggleBtn) toggleBtn.textContent = target === 'dark' ? '☀️' : '🌙';
     }
 
     // ─── INIT ──────────────────────────
     async function init() {
         initTheme();
         if (!currentUser) promptLogin();
-        else document.getElementById('userChip').textContent = currentUser;
+        else {
+            document.getElementById('userChip').textContent = currentUser;
+            if (currentUser === 'Admin') switchView('admin');
+        }
 
         await Promise.all([fetchSchedule(), fetchMyPicks(), fetchH2H()]);
         renderUpcomingMatches();
@@ -512,14 +547,11 @@
     }
 
     // ─── DATA FETCHING ──────────────────────────
-    const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/69b51614b7ec241ddc693348';
-    const MASTER_KEY = '$2a$10$hkFvOh3x6zhiDHHRVZteKOec/i2JSy.JXIX4qMTyYx4BvIs2m8.Fu';
-
     async function fetchSchedule() {
         try {
-            const res = await fetch('./schedule.json');
+            const res = await fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
             const data = await res.json();
-            scheduleData = data.matches;
+            scheduleData = data.record.matches || [];
         } catch (err) { console.error(err); }
     }
 
@@ -544,22 +576,35 @@
         } catch (err) { console.error(err); }
     }
 
+    const JSONBIN_CONFIG = { headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY } };
+
     // ─── NAVIGATION ──────────────────────────
     function switchView(viewName) {
+        if (currentUser === 'Admin' && viewName !== 'admin') return;
+
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.getElementById(`view-${viewName}`).classList.add('active');
 
-        document.querySelectorAll('.bottom-nav-item').forEach(el => {
-            el.classList.remove('text-brand-accent');
-            el.classList.add('text-brand-text');
-        });
-        const idx = viewName === 'upcoming' ? 0 : viewName === 'leaderboard' ? 1 : 2;
-        const navItems = document.querySelectorAll('.bottom-nav-item');
-        navItems[idx].classList.remove('text-brand-text');
-        navItems[idx].classList.add('text-brand-accent');
+        const nav = document.getElementById('bottomNav');
+        if (currentUser === 'Admin') {
+            if (nav) nav.style.display = 'none';
+        } else {
+            if (nav) nav.style.display = 'flex';
+            document.querySelectorAll('.bottom-nav-item').forEach(el => {
+                el.classList.remove('text-brand-accent');
+                el.classList.add('text-brand-text');
+            });
+            const idx = viewName === 'upcoming' ? 0 : viewName === 'leaderboard' ? 1 : 2;
+            const navItems = document.querySelectorAll('.bottom-nav-item');
+            if (navItems[idx]) {
+                navItems[idx].classList.remove('text-brand-text');
+                navItems[idx].classList.add('text-brand-accent');
+            }
+        }
 
         if (viewName === 'leaderboard') fetchLeaderboard();
         if (viewName === 'results') renderMyResults();
+        if (viewName === 'admin') renderAdminView();
     }
 
     function setupFilters() {
@@ -590,8 +635,21 @@
         document.getElementById('userChip').textContent = name;
         document.getElementById('loginModal').classList.remove('active');
         await fetchMyPicks();
-        renderUpcomingMatches();
-        if (document.getElementById('view-results').classList.contains('active')) renderMyResults();
+        
+        if (name === 'Admin') switchView('admin');
+        else {
+            switchView('upcoming');
+            renderUpcomingMatches();
+            if (document.getElementById('view-results').classList.contains('active')) renderMyResults();
+        }
+    }
+
+    function logoutAdmin() {
+        localStorage.removeItem('ipl_username');
+        currentUser = null;
+        document.getElementById('userChip').textContent = 'Guest';
+        switchView('upcoming');
+        promptLogin();
     }
 
     // ─── LEADERBOARD ──────────────────────────
@@ -800,7 +858,7 @@
                             <div class="stats-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 w-36 themed-tooltip border border-brand-overlay rounded-lg py-2 px-2.5 shadow-2xl text-center pointer-events-none">
                                 <p class="text-[8px] uppercase tracking-wider text-brand-text mb-1 font-bold">Head to Head</p>
                                 <p class="text-[11px] font-bold text-brand-primary">${h2hTooltip}</p>
-                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-6 border-transparent border-t-brand-darker"></div>
+                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-6 border-transparent border-t-[var(--tooltip-bg)]"></div>
                             </div>
                         </div>
                         <span class="font-extrabold text-xs tracking-tight text-brand-primary">${abbrA}</span>
@@ -821,7 +879,7 @@
                             <div class="stats-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 w-36 themed-tooltip border border-brand-overlay rounded-lg py-2 px-2.5 shadow-2xl text-center pointer-events-none">
                                 <p class="text-[8px] uppercase tracking-wider text-brand-text mb-1 font-bold">Head to Head</p>
                                 <p class="text-[11px] font-bold text-brand-primary">${h2hTooltip}</p>
-                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-6 border-transparent border-t-brand-darker"></div>
+                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-6 border-transparent border-t-[var(--tooltip-bg)]"></div>
                             </div>
                         </div>
                         <span class="font-extrabold text-xs tracking-tight text-brand-primary">${abbrB}</span>
@@ -1021,6 +1079,81 @@
         if (elWrong) elWrong.textContent = wrong;
         const acc = total > 0 ? Math.round((correct / total) * 100) : 0;
         if (elAcc) elAcc.textContent = acc + '%';
+    }
+
+    // ─── ADMIN VIEW ──────────────────────────
+    function renderAdminView() {
+        const tbody = document.getElementById('adminMatchesBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = scheduleData.map((m, idx) => {
+            const teamA = m.teamA;
+            const teamB = m.teamB;
+            const currentWinner = m.winner || 'None';
+            
+            return `
+                <tr class="border-b border-brand-overlay/50 last:border-0 hover:bg-brand-overlay/10">
+                    <td class="py-4">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-sm">${TEAM_ABBR[teamA] || teamA} vs ${TEAM_ABBR[teamB] || teamB}</span>
+                            <span class="text-[10px] text-brand-text">${m.dateLabel}</span>
+                        </div>
+                    </td>
+                    <td class="py-4 text-xs themed-text truncate max-w-[150px]">${m.venue}</td>
+                    <td class="py-4 font-semibold text-brand-primary text-sm">${TEAM_ABBR[currentWinner] || currentWinner}</td>
+                    <td class="py-4 text-right">
+                        <select id="winner-select-${idx}" class="bg-brand-darker border border-brand-overlay text-xs rounded-lg px-2 py-1 mr-2 focus:ring-brand-accent focus:border-brand-accent">
+                            <option value="">Set Winner</option>
+                            <option value="${teamA}" ${m.winner === teamA ? 'selected' : ''}>${TEAM_ABBR[teamA] || teamA}</option>
+                            <option value="${teamB}" ${m.winner === teamB ? 'selected' : ''}>${TEAM_ABBR[teamB] || teamB}</option>
+                            <option value="Draw" ${m.winner === 'Draw' ? 'selected' : ''}>Draw</option>
+                        </select>
+                        <button onclick="saveWinner(${idx})" class="bg-brand-accent text-brand-darker font-bold px-3 py-1 rounded text-xs hover:bg-orange-600 transition-colors">Save</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function saveWinner(matchIdx) {
+        const select = document.getElementById(`winner-select-${matchIdx}`);
+        const winner = select.value;
+        if (!winner) return;
+
+        // Show loading state on button
+        const btn = select.nextElementSibling;
+        const originalText = btn.textContent;
+        btn.textContent = '...';
+        btn.disabled = true;
+
+        try {
+            // Refetch latest schedule from JSONBin
+            const res = await fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+            const data = await res.json();
+            const latestMatches = data.record.matches;
+            
+            latestMatches[matchIdx].winner = winner;
+            
+            const putRes = await fetch(SCHEDULE_BIN_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                body: JSON.stringify({ matches: latestMatches })
+            });
+
+            if (putRes.ok) {
+                scheduleData = latestMatches;
+                renderAdminView();
+                alert('Winner updated successfully!');
+            } else {
+                alert('Failed to update winner.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error updating winner.');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 
     // ─── START ──────────────────────────
