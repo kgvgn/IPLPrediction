@@ -302,9 +302,9 @@
                             <tr>
                                 <th>Rank</th>
                                 <th>Player</th>
-                                <th>Correct</th>
-                                <th>Total</th>
-                                <th>Score %</th>
+                                <th class="text-center">Points</th>
+                                <th class="text-center">Correct</th>
+                                <th class="text-center">Total</th>
                             </tr>
                         </thead>
                         <tbody id="leaderboardBody">
@@ -345,7 +345,8 @@
                                 <th>Fixture</th>
                                 <th>Your Pick</th>
                                 <th>Status</th>
-                                <th>Prediction%</th>
+                                <th class="text-center">Points</th>
+                                <th class="text-center">Prediction%</th>
                             </tr>
                         </thead>
                         <tbody id="resultsBody">
@@ -407,12 +408,23 @@
     <div class="fixed inset-0 bg-brand-darker/90 backdrop-blur-sm" onclick="document.getElementById('loginModal').classList.remove('active')"></div>
     <div class="modal-inner relative bg-brand-muted border border-brand-overlay rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-8">
         <h3 class="text-2xl font-bold mb-2">Welcome to IPL Predictor</h3>
-        <p class="text-brand-text text-sm mb-8 leading-relaxed">Enter your name to start predicting matches and winning rewards.</p>
-        <label class="sr-only" for="loginInput">Your Name</label>
-        <input class="block w-full rounded-xl bg-brand-darker border border-brand-overlay text-brand-primary focus:border-brand-accent focus:ring-brand-accent text-lg py-4 px-4 mb-5" id="loginInput" placeholder="Your Name" type="text" onkeydown="if(event.key==='Enter') saveName()"/>
-        <button class="w-full bg-brand-accent hover:bg-orange-600 text-brand-darker font-bold py-4 rounded-xl shadow-lg transition-all text-lg" onclick="saveName()">
-            Let's Go
-        </button>
+        <p class="text-brand-text text-sm mb-6 leading-relaxed" id="loginMsg">Enter your name and a 4-digit PIN to start predicting.</p>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="sr-only" for="loginInput">Your Name</label>
+                <input class="block w-full rounded-xl bg-brand-darker border border-brand-overlay text-brand-primary focus:border-brand-accent focus:ring-brand-accent text-lg py-4 px-4" id="loginInput" placeholder="Your Name" type="text" oninput="checkUserStatus()"/>
+            </div>
+            <div>
+                <label class="sr-only" for="loginPin">4-Digit PIN</label>
+                <input class="block w-full rounded-xl bg-brand-darker border border-brand-overlay text-brand-primary focus:border-brand-accent focus:ring-brand-accent text-center text-2xl tracking-[1em] py-4 px-4" id="loginPin" placeholder="PIN" type="password" maxlength="4" pattern="\d{4}" inputmode="numeric" onkeydown="if(event.key==='Enter') saveName()"/>
+                <p id="pinHint" class="text-[10px] text-brand-text mt-2 text-center uppercase tracking-widest font-bold">Set a 4-digit PIN</p>
+            </div>
+            
+            <button class="w-full bg-brand-accent hover:bg-orange-600 text-brand-darker font-bold py-4 rounded-xl shadow-lg transition-all text-lg" id="loginBtn" onclick="saveName()">
+                Let's Go
+            </button>
+        </div>
     </div>
 </div>
 
@@ -490,6 +502,7 @@
     let activeFilter = 'All';
     let globalAllPicks = [];
     let globalAllPlayers = new Set();
+    let globalUsers = {}; // Mapping of username to PIN
 
     const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/69b51614b7ec241ddc693348';
     const SCHEDULE_BIN_URL = 'https://api.jsonbin.io/v3/b/69b89f95aa77b81da9eefef2';
@@ -561,6 +574,7 @@
             const data = await res.json();
             const allPicks = data.record.picks || [];
             globalAllPicks = allPicks;
+            globalUsers = data.record.users || {};
             globalAllPlayers = new Set(allPicks.map(p => p.userName));
             if (currentUser) {
                 myPicks = allPicks.filter(p => p.userName === currentUser);
@@ -624,28 +638,103 @@
     function promptLogin() {
         document.getElementById('loginModal').classList.add('active');
         document.getElementById('loginInput').value = currentUser || '';
+        document.getElementById('loginPin').value = '';
+        checkUserStatus();
         setTimeout(() => document.getElementById('loginInput').focus(), 100);
+    }
+
+    function checkUserStatus() {
+        const name = document.getElementById('loginInput').value.trim();
+        const hint = document.getElementById('pinHint');
+        const loginBtn = document.getElementById('loginBtn');
+        const msg = document.getElementById('loginMsg');
+
+        if (!name) {
+            hint.textContent = "Enter your name first";
+            return;
+        }
+
+        if (globalUsers[name]) {
+            hint.textContent = "Welcome back! Enter your 4-digit PIN";
+            msg.textContent = "Existing user detected. Please verify your PIN.";
+            loginBtn.textContent = "Login";
+        } else {
+            hint.textContent = "New user! Set a 4-digit PIN to register";
+            msg.textContent = "Register a new account with a 4-digit PIN.";
+            loginBtn.textContent = "Register Account";
+        }
     }
 
     async function saveName() {
         const name = document.getElementById('loginInput').value.trim();
-        if (!name) return;
-        currentUser = name;
-        localStorage.setItem('ipl_username', name);
-        document.getElementById('userChip').textContent = name;
-        document.getElementById('loginModal').classList.remove('active');
-        await fetchMyPicks();
-        
-        if (name === 'Admin') switchView('admin');
-        else {
-            switchView('upcoming');
-            renderUpcomingMatches();
-            if (document.getElementById('view-results').classList.contains('active')) renderMyResults();
+        const pin = document.getElementById('loginPin').value.trim();
+        const loginBtn = document.getElementById('loginBtn');
+
+        if (!name) { alert('Please enter your name'); return; }
+        if (!/^\d{4}$/.test(pin)) { alert('Please enter a 4-digit PIN'); return; }
+
+        const originalBtnText = loginBtn.textContent;
+        loginBtn.textContent = 'Verifying...';
+        loginBtn.disabled = true;
+
+        try {
+            const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+            const data = await res.json();
+            const users = data.record.users || {};
+            const allPicks = data.record.picks || [];
+
+            if (users[name]) {
+                // Existing user validation
+                if (users[name] !== pin) {
+                    alert('Incorrect PIN for this username!');
+                    loginBtn.textContent = originalBtnText;
+                    loginBtn.disabled = false;
+                    return;
+                }
+            } else {
+                // Registration
+                users[name] = pin;
+                const updateRes = await fetch(JSONBIN_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify({ picks: allPicks, users: users })
+                });
+                if (!updateRes.ok) {
+                    alert('Failed to register user.');
+                    loginBtn.textContent = originalBtnText;
+                    loginBtn.disabled = false;
+                    return;
+                }
+            }
+
+            currentUser = name;
+            localStorage.setItem('ipl_username', name);
+            localStorage.setItem('ipl_pin', pin); // Store locally for session persistence
+            document.getElementById('userChip').textContent = name;
+            document.getElementById('loginModal').classList.remove('active');
+            
+            globalUsers = users;
+            globalAllPicks = allPicks;
+            myPicks = allPicks.filter(p => p.userName === currentUser);
+
+            if (name === 'Admin') switchView('admin');
+            else {
+                switchView('upcoming');
+                renderUpcomingMatches();
+                if (document.getElementById('view-results').classList.contains('active')) renderMyResults();
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Authentication error.');
+        } finally {
+            loginBtn.textContent = originalBtnText;
+            loginBtn.disabled = false;
         }
     }
 
     function logoutAdmin() {
         localStorage.removeItem('ipl_username');
+        localStorage.removeItem('ipl_pin');
         currentUser = null;
         document.getElementById('userChip').textContent = 'Guest';
         switchView('upcoming');
@@ -671,10 +760,13 @@
 
             const userStats = {};
             allPicks.forEach(p => {
-                if (!userStats[p.userName]) userStats[p.userName] = { name: p.userName, correct: 0, total: 0 };
+                if (!userStats[p.userName]) userStats[p.userName] = { name: p.userName, correct: 0, total: 0, points: 0 };
                 if (resultsMap[p.matchId] !== undefined) {
                     userStats[p.userName].total++;
-                    if (p.team === resultsMap[p.matchId]) userStats[p.userName].correct++;
+                    if (p.team === resultsMap[p.matchId]) {
+                        userStats[p.userName].correct++;
+                        userStats[p.userName].points += (p.points || 0);
+                    }
                 }
             });
 
@@ -683,7 +775,7 @@
                 return { ...stat, scorePct: parseFloat(scorePct) };
             });
 
-            leaderboard.sort((a, b) => b.correct !== a.correct ? b.correct - a.correct : b.scorePct - a.scorePct);
+            leaderboard.sort((a, b) => b.points !== a.points ? b.points - a.points : b.correct - a.correct);
             leaderboard.forEach((user, index) => { user.rank = index + 1; });
 
             if (leaderboard.length === 0) {
@@ -692,12 +784,12 @@
             }
 
             tbody.innerHTML = leaderboard.map(l => `
-                <tr>
+                <tr class="${l.name === currentUser ? 'bg-brand-accent/5' : ''}">
                     <td class="font-bold text-brand-accent">#${l.rank}</td>
                     <td class="font-medium">${l.name} ${l.name === currentUser ? '<span class="ml-1.5 text-[10px] bg-brand-accent text-brand-darker px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}</td>
-                    <td class="text-green-400 font-semibold">${l.correct}</td>
-                    <td class="text-brand-text">${l.total}</td>
-                    <td class="font-semibold">${l.scorePct}%</td>
+                    <td class="text-brand-accent font-black text-center">${Math.round(l.points)}</td>
+                    <td class="text-green-400 font-semibold text-center">${l.correct}</td>
+                    <td class="text-brand-text text-center">${l.total}</td>
                 </tr>
             `).join('');
         } catch (err) {
@@ -932,16 +1024,18 @@
         }
 
         try {
-            const currentRes = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-            const currentData = await currentRes.json();
+            const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+            const currentData = await res.json();
             let allPicks = currentData.record.picks || [];
+            let users = currentData.record.users || {};
+            
             allPicks = allPicks.filter(p => !(p.userName === currentUser && p.matchId === matchId));
             allPicks.push({ userName: currentUser, matchId, team, frozen: true, timestamp: new Date().toISOString() });
 
             const saveRes = await fetch(JSONBIN_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                body: JSON.stringify({ picks: allPicks })
+                body: JSON.stringify({ picks: allPicks, users: users })
             });
 
             if (saveRes.ok) {
@@ -1049,18 +1143,21 @@
                 if (totalPlayers > 0) {
                     const matchPicks = allPicks.filter(p => p.matchId === m.id);
                     const correctPredictors = matchPicks.filter(p => p.team === m.winner).length;
-                    // Players who didn't predict count as wrong (denominator is totalPlayers)
                     const pct = Math.round((correctPredictors / totalPlayers) * 100);
                     const pctColor = pct >= 50 ? 'text-green-400' : 'text-red-400';
                     predPctHtml = `<button class="${pctColor} font-semibold hover:underline cursor-pointer transition-colors px-2 py-1 bg-brand-overlay rounded-lg hover:bg-brand-overlay2" onclick="showPredictionModal('${m.id}')">${pct}%</button>`;
                 }
             }
+            
+            const pointsDisplay = myPick && myPick.points ? `<span class="text-brand-accent font-black">+${Math.round(myPick.points)}</span>` : '<span class="text-brand-text">0</span>';
+
             return `
                 <tr>
                     <td class="text-brand-text text-xs whitespace-nowrap">${m.dateLabel}</td>
                     <td class="font-medium text-sm">${TEAM_ABBR[m.teamA] || m.teamA} vs ${TEAM_ABBR[m.teamB] || m.teamB}</td>
                     <td class="font-semibold text-sm">${TEAM_ABBR[pickText] || pickText}</td>
                     <td class="text-sm">${statusMsg}</td>
+                    <td class="text-sm text-center font-bold">${pointsDisplay}</td>
                     <td class="text-sm text-center">${predPctHtml}</td>
                 </tr>
             `;
@@ -1127,25 +1224,58 @@
         btn.disabled = true;
 
         try {
-            // Refetch latest schedule from JSONBin
-            const res = await fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-            const data = await res.json();
-            const latestMatches = data.record.matches;
+            // Refetch latest schedule and picks
+            const $[scheduleRes, picksRes] = await Promise.all([
+                fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
+                fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
+            ]);
             
+            const scheduleDataBin = await scheduleRes.json();
+            const picksDataBin = await picksRes.json();
+            
+            const latestMatches = scheduleDataBin.record.matches;
+            const allPicks = picksDataBin.record.picks || [];
+            const users = picksDataBin.record.users || {};
+            
+            // 1. Update Match Winner in Schedule
             latestMatches[matchIdx].winner = winner;
+            const matchId = latestMatches[matchIdx].id;
+
+            // 2. Calculate Points for this match
+            const matchPicks = allPicks.filter(p => p.matchId === matchId);
+            const totalPool = matchPicks.length * 100;
+            const correctPicks = matchPicks.filter(p => p.team === winner);
             
-            const putRes = await fetch(SCHEDULE_BIN_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                body: JSON.stringify({ matches: latestMatches })
+            const pointsPerWinner = correctPicks.length > 0 ? (totalPool / correctPicks.length) : 0;
+
+            // 3. Update Picks with points
+            allPicks.forEach(p => {
+                if (p.matchId === matchId) {
+                    p.points = p.team === winner ? pointsPerWinner : 0;
+                }
             });
 
-            if (putRes.ok) {
+            // 4. Save both bins
+            const $[saveSchedule, savePicks] = await Promise.all([
+                fetch(SCHEDULE_BIN_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify({ matches: latestMatches })
+                }),
+                fetch(JSONBIN_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify({ picks: allPicks, users: users })
+                })
+            ]);
+
+            if (saveSchedule.ok && savePicks.ok) {
                 scheduleData = latestMatches;
+                globalAllPicks = allPicks;
                 renderAdminView();
-                alert('Winner updated successfully!');
+                alert(`Winner updated! Pool: ${totalPool}, Correct: ${correctPicks.length}, Points/Winner: ${Math.round(pointsPerWinner)}`);
             } else {
-                alert('Failed to update winner.');
+                alert('Failed to update data.');
             }
         } catch (e) {
             console.error(e);
