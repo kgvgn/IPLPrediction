@@ -303,8 +303,8 @@
                                 <th>Rank</th>
                                 <th>Player</th>
                                 <th class="text-center">Points</th>
-                                <th class="text-center">Correct</th>
-                                <th class="text-center">Total</th>
+                                <th class="text-center">Correct/Total</th>
+                                <th class="text-center">Score %</th>
                             </tr>
                         </thead>
                         <tbody id="leaderboardBody">
@@ -545,7 +545,7 @@
         if (!currentUser) promptLogin();
         else {
             document.getElementById('userChip').textContent = currentUser;
-            if (currentUser === 'Admin') switchView('admin');
+            if (currentUser === 'ADMIN') switchView('admin');
         }
 
         await Promise.all([fetchSchedule(), fetchMyPicks(), fetchH2H()]);
@@ -594,13 +594,13 @@
 
     // ─── NAVIGATION ──────────────────────────
     function switchView(viewName) {
-        if (currentUser === 'Admin' && viewName !== 'admin') return;
+        if (currentUser === 'ADMIN' && viewName !== 'admin') return;
 
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.getElementById(`view-${viewName}`).classList.add('active');
 
         const nav = document.getElementById('bottomNav');
-        if (currentUser === 'Admin') {
+        if (currentUser === 'ADMIN') {
             if (nav) nav.style.display = 'none';
         } else {
             if (nav) nav.style.display = 'flex';
@@ -644,7 +644,7 @@
     }
 
     function checkUserStatus() {
-        const name = document.getElementById('loginInput').value.trim();
+        const name = document.getElementById('loginInput').value.trim().toUpperCase();
         const hint = document.getElementById('pinHint');
         const loginBtn = document.getElementById('loginBtn');
         const msg = document.getElementById('loginMsg');
@@ -666,7 +666,7 @@
     }
 
     async function saveName() {
-        const name = document.getElementById('loginInput').value.trim();
+        const name = document.getElementById('loginInput').value.trim().toUpperCase();
         const pin = document.getElementById('loginPin').value.trim();
         const loginBtn = document.getElementById('loginBtn');
 
@@ -717,7 +717,7 @@
             globalAllPicks = allPicks;
             myPicks = allPicks.filter(p => p.userName === currentUser);
 
-            if (name === 'Admin') switchView('admin');
+            if (name === 'ADMIN') switchView('admin');
             else {
                 switchView('upcoming');
                 renderUpcomingMatches();
@@ -747,15 +747,18 @@
         tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-brand-text">Loading...</td></tr>';
 
         try {
-            const schedRes = await fetch('./schedule.json');
+            const [schedRes, binRes] = await Promise.all([
+                fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
+                fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
+            ]);
+            
             const schedData = await schedRes.json();
-            const allMatches = schedData.matches;
-
+            const binData = await binRes.json();
+            
+            const allMatches = schedData.record.matches || [];
             const resultsMap = {};
             allMatches.forEach(m => { if (m.winner !== null) resultsMap[m.id] = m.winner; });
 
-            const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-            const binData = await res.json();
             const allPicks = binData.record.picks || [];
 
             const userStats = {};
@@ -788,8 +791,8 @@
                     <td class="font-bold text-brand-accent">#${l.rank}</td>
                     <td class="font-medium">${l.name} ${l.name === currentUser ? '<span class="ml-1.5 text-[10px] bg-brand-accent text-brand-darker px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}</td>
                     <td class="text-brand-accent font-black text-center">${Math.round(l.points)}</td>
-                    <td class="text-green-400 font-semibold text-center">${l.correct}</td>
-                    <td class="text-brand-text text-center">${l.total}</td>
+                    <td class="text-green-400 font-semibold text-center">${l.correct}/${l.total}</td>
+                    <td class="text-brand-text text-center font-semibold">${l.scorePct}%</td>
                 </tr>
             `).join('');
         } catch (err) {
@@ -1122,7 +1125,7 @@
         let correct = 0, wrong = 0, total = 0;
 
         const rows = pastMatches.map(m => {
-            const myPick = myPicks.find(p => p.matchId === m.id);
+            const myPick = allPicks.find(p => p.matchId === m.id && p.userName === currentUser);
             const pickText = myPick ? myPick.team : '-';
             let statusMsg = '<span class="text-brand-text">Pending</span>';
             let predPctHtml = '<span class="text-brand-text">—</span>';
@@ -1225,7 +1228,7 @@
 
         try {
             // Refetch latest schedule and picks
-            const $[scheduleRes, picksRes] = await Promise.all([
+            const [scheduleRes, picksRes] = await Promise.all([
                 fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
                 fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
             ]);
@@ -1256,7 +1259,7 @@
             });
 
             // 4. Save both bins
-            const $[saveSchedule, savePicks] = await Promise.all([
+            const [saveSchedule, savePicks] = await Promise.all([
                 fetch(SCHEDULE_BIN_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
