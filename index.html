@@ -878,6 +878,9 @@
             const mainEl = document.querySelector('main');
             if (mainEl) mainEl.scrollTop = 0;
 
+            // Reset My Results filter on every view change
+            resultsFilter = 'all';
+
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(`view-${viewName}`).classList.add('active');
 
@@ -919,7 +922,7 @@
                 }
             }
 
-            if (viewName === 'leaderboard') fetchLeaderboard();
+            if (viewName === 'leaderboard') renderLeaderboard();
             if (viewName === 'results') renderMyResults();
             if (viewName === 'admin') renderAdminView();
             if (viewName === 'admin-users') renderAdminUsersView();
@@ -1112,47 +1115,39 @@
         }
 
         // ─── LEADERBOARD ──────────────────────────
-        async function fetchLeaderboard() {
+        function renderLeaderboard() {
             const tbody = document.getElementById('leaderboardBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-brand-text">Loading...</td></tr>';
+            if (!tbody) return;
+
+            if (scheduleData.length === 0 || globalAllPicks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-brand-text">Updating data...</td></tr>';
+                return;
+            }
 
             try {
-                const [schedRes, binRes] = await Promise.all([
-                    fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
-                    fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
-                ]);
-
-                const schedData = await schedRes.json();
-                const binData = await binRes.json();
-
-                const allMatches = schedData.record.matches || [];
                 const resultsMap = {};
-                allMatches.forEach(m => { 
+                scheduleData.forEach(m => { 
                     if (m.winner !== null && m.winner !== 'No Result') {
                         resultsMap[m.id] = m.winner; 
                     }
                 });
 
-                const decisiveMatches = allMatches.filter(m => m.winner !== null && m.winner !== 'No Result');
+                const decisiveMatches = scheduleData.filter(m => m.winner !== null && m.winner !== 'No Result');
                 const decisiveMatchCount = decisiveMatches.length;
-
-                const allPicks = binData.record.picks || [];
-                const usersMap = binData.record.users || {};
-                const playersList = [...new Set(allPicks.map(p => p.userName))].filter(u => u !== 'ADMIN');
+                const playersList = [...new Set(globalAllPicks.map(p => p.userName))].filter(u => u !== 'ADMIN');
 
                 const userStats = {};
-                // Initialize all known players with 0 stats
                 playersList.forEach(u => {
                     userStats[u] = { name: u, correct: 0, points: 0 };
                 });
 
-                allPicks.forEach(p => {
+                globalAllPicks.forEach(p => {
                     if (p.userName === 'ADMIN') return;
                     if (!userStats[p.userName]) userStats[p.userName] = { name: p.userName, correct: 0, points: 0 };
                     
-                    const match = resultsMap[p.matchId];
-                    if (match !== undefined) {
-                        if (p.team === match) {
+                    const matchIdx = resultsMap[p.matchId];
+                    if (matchIdx !== undefined) {
+                        if (p.team === matchIdx) {
                             userStats[p.userName].correct++;
                         }
                         userStats[p.userName].points += (p.points || 0);
@@ -1169,11 +1164,10 @@
 
                 leaderboardData = leaderboard;
                 renderLeaderboardTable();
-                renderLeaderboardChart(allMatches, allPicks);
-                updateGlobalMatchCounts(allMatches);
+                renderLeaderboardChart(scheduleData, globalAllPicks);
+                updateGlobalMatchCounts(scheduleData);
             } catch (err) {
-                console.error('Leaderboard Fetch Error:', err);
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-red-400">Failed to load leaderboard</td></tr>';
+                console.error('Leaderboard Render Error:', err);
             }
         }
 
@@ -1721,8 +1715,12 @@
         async function renderMyResults() {
             const tbody = document.getElementById('resultsBody');
             if (!tbody) return;
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-brand-text">Loading...</td></tr>';
+            
             if (!currentUser) { tbody.innerHTML = ''; return; }
+            if (scheduleData.length === 0 || globalAllPicks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-brand-text">Updating results...</td></tr>';
+                return;
+            }
 
             // Update button styles
             const btnCorrect = document.getElementById('btnFilterCorrect');
@@ -1743,26 +1741,13 @@
                 btnWrong.classList.replace('bg-brand-muted', 'bg-brand-accent/10');
             }
 
-            let allPicks = [];
-            try {
-                const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-                const data = await res.json();
-                allPicks = data.record.picks || [];
-                globalAllPicks = allPicks;
-            } catch (err) {
-                console.error('Failed to fetch all picks', err);
-                allPicks = globalAllPicks;
-            }
-
-            const allPlayers = new Set(allPicks.map(p => p.userName).filter(u => u !== 'ADMIN'));
-            globalAllPlayers = allPlayers;
-            const totalPlayers = allPlayers.size;
+            const totalPlayers = globalAllPlayers.size;
 
             const pastMatches = scheduleData.filter(m => m.winner !== null || new Date(m.startTimeISO).getTime() - 30 * 60 * 1000 <= Date.now());
             let correct = 0, wrong = 0, total = 0;
 
             const allRows = pastMatches.map(m => {
-                const myPick = allPicks.find(p => p.matchId === m.id && p.userName === currentUser);
+                const myPick = globalAllPicks.find(p => p.matchId === m.id && p.userName === currentUser);
                 const pickText = myPick ? myPick.team : '-';
                 let statusMsg = '<span class="text-brand-text">Pending</span>';
                 let predPctHtml = '<span class="text-brand-text">—</span>';
@@ -1788,7 +1773,7 @@
                         }
 
                         if (totalPlayers > 0) {
-                            const matchPicks = allPicks.filter(p => p.matchId === m.id && p.userName !== 'ADMIN');
+                            const matchPicks = globalAllPicks.filter(p => p.matchId === m.id && p.userName !== 'ADMIN');
                             const correctPredictors = matchPicks.filter(p => p.team === m.winner).length;
                             const pct = (correctPredictors / totalPlayers * 100).toFixed(2);
                             const pctColor = parseFloat(pct) >= 50 ? 'text-green-400' : 'text-red-400';
@@ -1837,7 +1822,7 @@
 
             if (elCorrect) elCorrect.textContent = correct;
             if (elWrong) elWrong.textContent = wrong;
-            const totalPoints = allPicks.filter(p => p.userName === currentUser).reduce((sum, p) => sum + (p.points || 0), 0);
+            const totalPoints = globalAllPicks.filter(p => p.userName === currentUser).reduce((sum, p) => sum + (p.points || 0), 0);
             if (elPoints) elPoints.textContent = Math.round(totalPoints);
             const acc = decisiveMatchCount > 0 ? (correct / decisiveMatchCount * 100).toFixed(2) : "0.00";
             if (elAcc) elAcc.textContent = acc + '%';
