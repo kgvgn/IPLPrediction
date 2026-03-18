@@ -804,15 +804,37 @@
         function getNormalizedData(record) {
             const rawPicks = record.picks || [];
             const rawUsers = record.users || {};
-            const normalizedPicks = rawPicks.map(p => ({
-                ...p,
-                userName: p.userName ? p.userName.toUpperCase().trim() : 'UNKNOWN'
-            }));
+            
+            const picksMap = {};
+            rawPicks.forEach(p => {
+                const uName = p.userName ? p.userName.toUpperCase().trim() : 'UNKNOWN';
+                const key = `${uName}|${p.matchId}`;
+                
+                const currentPick = { ...p, userName: uName };
+                
+                if (!picksMap[key]) {
+                    picksMap[key] = currentPick;
+                } else {
+                    const existing = picksMap[key];
+                    const hasPts = p.points !== undefined;
+                    const existingHasPts = existing.points !== undefined;
+                    
+                    // Priority: 1. Pick with points, 2. Most recent timestamp
+                    if (hasPts && !existingHasPts) {
+                        picksMap[key] = currentPick;
+                    } else if (hasPts === existingHasPts) {
+                        if (new Date(p.timestamp || 0) > new Date(existing.timestamp || 0)) {
+                            picksMap[key] = currentPick;
+                        }
+                    }
+                }
+            });
+
             const normalizedUsers = {};
             for (const name in rawUsers) {
                 normalizedUsers[name.toUpperCase().trim()] = rawUsers[name];
             }
-            return { picks: normalizedPicks, users: normalizedUsers };
+            return { picks: Object.values(picksMap), users: normalizedUsers };
         }
 
         const TEAM_ABBR = {
@@ -871,7 +893,7 @@
             try {
                 const res = await fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
                 const data = await res.json();
-                scheduleData = data.record.matches || [];
+                scheduleData = (data.record.matches || []).sort((a, b) => new Date(a.startTimeISO) - new Date(b.startTimeISO));
             } catch (err) { console.error(err); }
         }
 
@@ -1156,21 +1178,32 @@
                 });
 
                 const decisiveMatches = scheduleData.filter(m => m.winner !== null && m.winner !== 'No Result');
-                const decisiveMatchCount = decisiveMatches.length;
                 const playersList = [...new Set(globalAllPicks.map(p => p.userName))].filter(u => u !== 'ADMIN');
+
+                // Pre-calculate user arrival
+                const userFirstMatchIdxMap = {};
+                globalAllPicks.forEach(p => {
+                    if (p.userName === 'ADMIN') return;
+                    const mIdx = scheduleData.findIndex(m => m.id === p.matchId);
+                    if (mIdx !== -1) {
+                        if (userFirstMatchIdxMap[p.userName] === undefined || mIdx < userFirstMatchIdxMap[p.userName]) {
+                            userFirstMatchIdxMap[p.userName] = mIdx;
+                        }
+                    }
+                });
 
                 const userStats = {};
                 playersList.forEach(u => {
-                    userStats[u] = { name: u, correct: 0, points: 0 };
+                    userStats[u] = { name: u, correct: 0, points: 0, userDecisiveCount: 0 };
                 });
 
                 globalAllPicks.forEach(p => {
                     if (p.userName === 'ADMIN') return;
-                    if (!userStats[p.userName]) userStats[p.userName] = { name: p.userName, correct: 0, points: 0 };
+                    if (!userStats[p.userName]) userStats[p.userName] = { name: p.userName, correct: 0, points: 0, userDecisiveCount: 0 };
 
-                    const matchIdx = resultsMap[p.matchId];
-                    if (matchIdx !== undefined) {
-                        if (p.team === matchIdx) {
+                    const winner = resultsMap[p.matchId];
+                    if (winner !== undefined) {
+                        if (p.team === winner) {
                             userStats[p.userName].correct++;
                         }
                         userStats[p.userName].points += (p.points || 0);
@@ -1178,8 +1211,14 @@
                 });
 
                 const leaderboard = Object.values(userStats).map(stat => {
-                    const scorePct = decisiveMatchCount > 0 ? ((stat.correct / decisiveMatchCount) * 100).toFixed(2) : "0.00";
-                    return { ...stat, total: decisiveMatchCount, scorePct: parseFloat(scorePct) };
+                    const firstIdx = userFirstMatchIdxMap[stat.name] !== undefined ? userFirstMatchIdxMap[stat.name] : 0;
+                    const userDecisiveCount = decisiveMatches.filter(m => {
+                        const mIdx = scheduleData.findIndex(sm => sm.id === m.id);
+                        return mIdx >= firstIdx;
+                    }).length;
+                    
+                    const scorePct = userDecisiveCount > 0 ? ((stat.correct / userDecisiveCount) * 100).toFixed(2) : "0.00";
+                    return { ...stat, userDecisiveCount, scorePct: parseFloat(scorePct) };
                 });
 
                 leaderboard.sort((a, b) => b.points !== a.points ? b.points - a.points : b.correct - a.correct);
@@ -1244,8 +1283,8 @@
             <tr class="${l.name === currentUser ? 'bg-brand-accent/5' : ''}">
                 <td class="font-bold text-brand-accent">#${l.rank}</td>
                 <td class="font-medium">${l.name} ${l.name === currentUser ? '<span class="ml-1.5 text-[10px] bg-brand-accent text-brand-darker px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}</td>
-                <td class="text-brand-accent font-black text-center">${Math.round(l.points)}</td>
-                <td class="text-green-400 font-semibold text-center">${l.correct}</td>
+                <td class="text-brand-accent font-black text-center">${l.points.toFixed(2)}</td>
+                <td class="text-green-400 font-semibold text-center">${l.correct} / ${l.userDecisiveCount}</td>
                 <td class="text-brand-text text-center font-semibold">${l.scorePct.toFixed(2)}%</td>
             </tr>
         `).join('');
@@ -1618,11 +1657,14 @@
                 const checkA = pickValue === m.teamA ? '<div class="selected-check"><svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg></div>' : '';
                 const checkB = pickValue === m.teamB ? '<div class="selected-check"><svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg></div>' : '';
 
+                const matchTimeObj = new Date(m.startTimeISO);
+                const timeStr = matchTimeObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
                 const card = document.createElement('article');
                 card.className = 'themed-card rounded-xl p-3.5 shadow-xl transition-transform active:scale-[0.99]';
                 card.innerHTML = `
                 <div class="flex justify-between items-center mb-3">
-                    <span class="text-[9px] uppercase tracking-widest text-brand-accent font-bold">${m.dateLabel}</span>
+                    <span class="text-[9px] uppercase tracking-widest text-brand-accent font-bold">${m.dateLabel} • ${timeStr}</span>
                     <span class="text-[8px] themed-chip px-1.5 py-0.5 rounded font-medium truncate max-w-[55%]" title="${m.venue}">${m.venue}</span>
                 </div>
                 <div class="flex items-center justify-between mb-4 relative">
@@ -1868,16 +1910,19 @@
                     }
                 }
 
-                const pts = myPick && myPick.points !== undefined ? Math.round(myPick.points) : 0;
+                const pts = myPick && myPick.points !== undefined ? Number(myPick.points.toFixed(2)) : 0;
                 const pointsDisplay = pts > 0
-                    ? `<span class="text-green-400 font-black">+${pts}</span>`
+                    ? `<span class="text-green-400 font-black">+${pts.toFixed(2)}</span>`
                     : pts < 0
-                        ? `<span class="text-red-400 font-black">${pts}</span>`
-                        : `<span class="text-brand-text">${pts}</span>`;
+                        ? `<span class="text-red-400 font-black">${pts.toFixed(2)}</span>`
+                        : `<span class="text-brand-text">${pts.toFixed(2)}</span>`;
+
+                const matchTimeObj = new Date(m.startTimeISO);
+                const timeStr = matchTimeObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 
                 const html = `
                     <tr>
-                        <td class="text-brand-text text-xs whitespace-nowrap">${m.dateLabel}</td>
+                        <td class="text-brand-text text-xs whitespace-nowrap">${m.dateLabel}<br>${timeStr}</td>
                         <td class="font-medium text-sm">${TEAM_ABBR[m.teamA] || m.teamA} vs ${TEAM_ABBR[m.teamB] || m.teamB}</td>
                         <td class="font-semibold text-sm">${TEAM_ABBR[pickText] || pickText}</td>
                         <td class="text-sm">${statusMsg}</td>
@@ -1908,8 +1953,13 @@
             if (elCorrect) elCorrect.textContent = correct;
             if (elWrong) elWrong.textContent = wrong;
             const totalPoints = globalAllPicks.filter(p => p.userName === currentUser).reduce((sum, p) => sum + (p.points || 0), 0);
-            if (elPoints) elPoints.textContent = Math.round(totalPoints);
-            const acc = decisiveMatchCount > 0 ? (correct / decisiveMatchCount * 100).toFixed(2) : "0.00";
+            if (elPoints) elPoints.textContent = totalPoints.toFixed(2);
+            
+            // Per-user accuracy numerator: matches played by THIS user
+            const myFirstIdx = userFirstMatchIdxMap[currentUser] !== undefined ? userFirstMatchIdxMap[currentUser] : 0;
+            const myDecisiveMatchesCount = scheduleData.filter((m, idx) => m.winner !== null && m.winner !== 'No Result' && idx >= myFirstIdx).length;
+            
+            const acc = myDecisiveMatchesCount > 0 ? (correct / myDecisiveMatchesCount * 100).toFixed(2) : "0.00";
             if (elAcc) elAcc.textContent = acc + '%';
             updateGlobalMatchCounts(scheduleData);
         }
@@ -1938,7 +1988,7 @@
                     <td class="py-4">
                         <div class="flex flex-col">
                             <span class="font-bold text-sm text-brand-primary">${TEAM_ABBR[teamA] || teamA} vs ${TEAM_ABBR[teamB] || teamB}</span>
-                            <span class="text-[10px] text-brand-text opacity-70">${m.dateLabel}</span>
+                            <span class="text-[10px] text-brand-text opacity-70">${m.dateLabel} • ${new Date(m.startTimeISO).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
                         </div>
                     </td>
                     <td class="py-4 text-xs themed-text truncate max-w-[150px]">${m.venue}</td>
@@ -1965,6 +2015,7 @@
             const winner = select.value;
             if (!winner) return;
 
+            const targetMatchId = scheduleData[matchIdx].id;
             const btn = select.nextElementSibling;
             const originalText = btn.textContent;
             btn.textContent = '...';
@@ -1975,7 +2026,13 @@
                 const scheduleDataBin = await scheduleRes.json();
                 const latestMatches = scheduleDataBin.record.matches;
 
-                latestMatches[matchIdx].winner = winner;
+                const matchObj = latestMatches.find(m => m.id === targetMatchId);
+                if (matchObj) {
+                    matchObj.winner = winner;
+                } else {
+                    alert('Match not found on server.');
+                    return;
+                }
 
                 const saveSchedule = await fetch(SCHEDULE_BIN_URL, {
                     method: 'PUT',
@@ -1984,7 +2041,8 @@
                 });
 
                 if (saveSchedule.ok) {
-                    scheduleData = latestMatches;
+                    // Refresh local shadow Copy - sorting will happen next time we open admin view or fetch
+                    scheduleData = latestMatches.sort((a, b) => new Date(a.startTimeISO) - new Date(b.startTimeISO));
                     renderAdminView();
                     alert(`Winner saved! Now you can distribute rewards.`);
                 } else {
@@ -2034,7 +2092,8 @@
                             p.points = 0; // No points for No Result
                         } else {
                             // Net points = Reward (if winner) - Entry Fee (100)
-                            p.points = (p.team === winner ? pointsPerWinner : 0) - 100;
+                            const net = (p.team === winner ? pointsPerWinner : 0) - 100;
+                            p.points = Number(net.toFixed(2));
                         }
                         usersWithEntry.add(p.userName);
                     }
@@ -2052,7 +2111,7 @@
                         });
                         // If it's not a 'No Result' and they missed, they lose 100
                         if (!isNoResult) {
-                            allPicks[allPicks.length - 1].points = -100;
+                            allPicks[allPicks.length - 1].points = Number((-100).toFixed(2));
                         }
                     }
                 });
@@ -2066,7 +2125,7 @@
                 if (savePicks.ok) {
                     globalAllPicks = allPicks;
                     renderAdminView();
-                    alert(`Rewards distributed! Pool: ${totalPool}, Correct: ${correctPicks.length}, Points/Winner: ${Math.round(pointsPerWinner)}`);
+                    alert(`Rewards distributed! Pool: ${totalPool}, Correct: ${correctPicks.length}, Points/Winner: ${pointsPerWinner.toFixed(2)}`);
                 } else {
                     alert('Failed to distribute rewards.');
                 }
