@@ -2407,6 +2407,52 @@
                 if (!isProgrammaticFocus && stadiumSelect.showPicker) stadiumSelect.showPicker(); 
             };
 
+            // MOBILE FRIENDLY AUTO-ADVANCE & VALIDATION
+            teamAInput.addEventListener('input', () => {
+                const val = teamAInput.value.trim().toUpperCase();
+                if (val.length === 2 || val.length === 3) {
+                    if (ABBR_TO_TEAM[val]) updateStadiumDropdown();
+                }
+            });
+
+            teamBInput.addEventListener('input', () => {
+                const valB = teamBInput.value.trim().toUpperCase();
+                const valA = teamAInput.value.trim().toUpperCase();
+                if (valB.length >= 2 && ABBR_TO_TEAM[valB] && valA !== valB) {
+                    // Could auto-advance to Date, but perhaps let user finish typing
+                }
+            });
+
+            dateInput.addEventListener('input', () => {
+                const val = dateInput.value.trim();
+                if (val.length === 8) { // DD/MM/YY is 8 chars
+                    // Validate immediately
+                    const p = val.split('/');
+                    const d = parseInt(p[0]), m = parseInt(p[1]) - 1, y = 2000 + parseInt(p[2]);
+                    const t = new Date(y, m, d);
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    if (t.getFullYear() === y && t.getMonth() === m && t.getDate() === d && t >= today) {
+                        timeSelect.focus(); // AUTO-ADVANCE
+                    }
+                }
+            });
+
+            timeSelect.addEventListener('change', () => {
+                if (timeSelect.value) {
+                    if (stadiumSelect.getAttribute('tabindex') === '-1') {
+                        saveBtn.focus();
+                    } else {
+                        stadiumSelect.focus();
+                    }
+                }
+            });
+
+            stadiumSelect.addEventListener('change', () => {
+                if (stadiumSelect.value && !stadiumSelect.value.includes('Select')) {
+                    saveBtn.focus();
+                }
+            });
+
             const handleKeys = (e) => {
                 const view = document.getElementById('view-admin-schedule');
                 if (!view || !view.classList.contains('active')) return;
