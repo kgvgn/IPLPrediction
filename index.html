@@ -2407,48 +2407,113 @@
                 if (!isProgrammaticFocus && stadiumSelect.showPicker) stadiumSelect.showPicker(); 
             };
 
+            let isSkippingValidation = false;
+
+            // SHARED VALIDATION FUNCTIONS
+            const validateTeamA = () => {
+                if (isSkippingValidation) return true;
+                const val = teamAInput.value.trim().toUpperCase();
+                if (val && !ABBR_TO_TEAM[val]) {
+                    alert('Invalid Team A entered');
+                    teamAInput.value = '';
+                    setTimeout(() => teamAInput.focus(), 10);
+                    return false;
+                }
+                return true;
+            };
+            const validateTeamB = () => {
+                if (isSkippingValidation) return true;
+                const valB = teamBInput.value.trim().toUpperCase();
+                const valA = teamAInput.value.trim().toUpperCase();
+                if (valB) {
+                    if (!ABBR_TO_TEAM[valB]) {
+                        alert('Invalid Team B entered');
+                        teamBInput.value = '';
+                        setTimeout(() => teamBInput.focus(), 10);
+                        return false;
+                    } else if (valA === valB) {
+                        alert('Teams A and B must be different!');
+                        teamBInput.value = '';
+                        setTimeout(() => teamBInput.focus(), 10);
+                        return false;
+                    }
+                }
+                return true;
+            };
+            const validateDate = () => {
+                if (isSkippingValidation) return true;
+                const val = dateInput.value.trim();
+                if (!val) return true;
+                if (!/^\d{2}\/\d{2}\/\d{2}$/.test(val)) {
+                    alert('Invalid Date Format! Use DD/MM/YY');
+                    dateInput.value = '';
+                    setTimeout(() => dateInput.focus(), 10);
+                    return false;
+                }
+                const p = val.split('/');
+                const d = parseInt(p[0]), m = parseInt(p[1]) - 1, y = 2000 + parseInt(p[2]);
+                const t = new Date(y, m, d);
+                if (t.getFullYear() !== y || t.getMonth() !== m || t.getDate() !== d) {
+                    alert('Invalid Calendar Date!');
+                    dateInput.value = '';
+                    setTimeout(() => dateInput.focus(), 10);
+                    return false;
+                }
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                if (t < today) {
+                    alert('Past date entered! Please enter a current or future date.');
+                    dateInput.value = '';
+                    setTimeout(() => dateInput.focus(), 10);
+                    return false;
+                }
+                return true;
+            };
+            const validateTime = () => {
+                if (isSkippingValidation) return true;
+                if (!timeSelect.value) {
+                    alert('Please select a Time!');
+                    setTimeout(() => timeSelect.focus(), 10);
+                    return false;
+                }
+                return true;
+            };
+            const validateStadium = () => {
+                if (isSkippingValidation) return true;
+                if (!stadiumSelect.value || stadiumSelect.value.includes('Select')) {
+                    alert('Please select a Stadium!');
+                    setTimeout(() => stadiumSelect.focus(), 10);
+                    return false;
+                }
+                return true;
+            };
+
+            // ATTACH BLUR HANDLERS FOR MOBILE (and click-away)
+            teamAInput.onblur = validateTeamA;
+            teamBInput.onblur = validateTeamB;
+            dateInput.onblur = validateDate;
+
             // MOBILE FRIENDLY AUTO-ADVANCE & VALIDATION
             teamAInput.addEventListener('input', () => {
                 const val = teamAInput.value.trim().toUpperCase();
-                if (val.length === 2 || val.length === 3) {
-                    if (ABBR_TO_TEAM[val]) updateStadiumDropdown();
-                }
-            });
-
-            teamBInput.addEventListener('input', () => {
-                const valB = teamBInput.value.trim().toUpperCase();
-                const valA = teamAInput.value.trim().toUpperCase();
-                if (valB.length >= 2 && ABBR_TO_TEAM[valB] && valA !== valB) {
-                    // Could auto-advance to Date, but perhaps let user finish typing
-                }
+                if (val.length >= 2 && ABBR_TO_TEAM[val]) updateStadiumDropdown();
             });
 
             dateInput.addEventListener('input', () => {
                 const val = dateInput.value.trim();
-                if (val.length === 8) { // DD/MM/YY is 8 chars
-                    // Validate immediately
-                    const p = val.split('/');
-                    const d = parseInt(p[0]), m = parseInt(p[1]) - 1, y = 2000 + parseInt(p[2]);
-                    const t = new Date(y, m, d);
-                    const today = new Date(); today.setHours(0,0,0,0);
-                    if (t.getFullYear() === y && t.getMonth() === m && t.getDate() === d && t >= today) {
-                        timeSelect.focus(); // AUTO-ADVANCE
-                    }
+                if (val.length === 8 && /^\d{2}\/\d{2}\/\d{2}$/.test(val)) {
+                    if (validateDate()) timeSelect.focus();
                 }
             });
 
             timeSelect.addEventListener('change', () => {
-                if (timeSelect.value) {
-                    if (stadiumSelect.getAttribute('tabindex') === '-1') {
-                        saveBtn.focus();
-                    } else {
-                        stadiumSelect.focus();
-                    }
+                if (timeSelect.value && validateTime()) {
+                    if (stadiumSelect.getAttribute('tabindex') === '-1') saveBtn.focus();
+                    else stadiumSelect.focus();
                 }
             });
 
             stadiumSelect.addEventListener('change', () => {
-                if (stadiumSelect.value && !stadiumSelect.value.includes('Select')) {
+                if (stadiumSelect.value && !stadiumSelect.value.includes('Select') && validateStadium()) {
                     saveBtn.focus();
                 }
             });
@@ -2463,83 +2528,33 @@
 
                     if (!isBack) {
                         // FORWARD NAVIGATION (VALIDATE)
-                        if (cur === teamAInput) {
-                            const val = cur.value.trim().toUpperCase();
-                            if (val && !ABBR_TO_TEAM[val]) {
-                                alert('Invalid Team A entered');
-                                cur.value = '';
-                                e.preventDefault(); return;
-                            }
-                        } else if (cur === teamBInput) {
-                            const valB = cur.value.trim().toUpperCase();
-                            const valA = teamAInput.value.trim().toUpperCase();
-                            if (valB) {
-                                if (!ABBR_TO_TEAM[valB]) {
-                                    alert('Invalid Team B entered');
-                                    cur.value = '';
-                                    e.preventDefault(); return;
-                                } else if (valA === valB) {
-                                    alert('Teams A and B must be different!');
-                                    cur.value = '';
-                                    e.preventDefault(); return;
-                                }
-                            }
-                        } else if (cur === dateInput) {
-                            const val = cur.value.trim();
-                            if (val) {
-                                if (!/^\d{2}\/\d{2}\/\d{2}$/.test(val)) {
-                                    alert('Invalid Date Format! Use DD/MM/YY');
-                                    cur.value = '';
-                                    e.preventDefault(); return;
-                                }
-                                const p = val.split('/');
-                                const d = parseInt(p[0]), m = parseInt(p[1]) - 1, y = 2000 + parseInt(p[2]);
-                                const t = new Date(y, m, d);
-                                if (t.getFullYear() !== y || t.getMonth() !== m || t.getDate() !== d) {
-                                    alert('Invalid Calendar Date!');
-                                    cur.value = '';
-                                    e.preventDefault(); return;
-                                }
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                if (t < today) {
-                                    alert('Past date entered! Please enter a current or future date.');
-                                    cur.value = '';
-                                    e.preventDefault(); return;
-                                }
-                            }
-                        } else if (cur === timeSelect) {
-                            if (!timeSelect.value) {
-                                alert('Please select a Time!');
-                                e.preventDefault(); return;
-                            }
+                        if (cur === teamAInput && !validateTeamA()) { e.preventDefault(); return; }
+                        if (cur === teamBInput && !validateTeamB()) { e.preventDefault(); return; }
+                        if (cur === dateInput && !validateDate()) { e.preventDefault(); return; }
+                        if (cur === timeSelect) {
+                            if (!validateTime()) { e.preventDefault(); return; }
                             e.preventDefault();
-                            if (stadiumSelect.getAttribute('tabindex') === '-1') {
-                                saveBtn.focus();
-                            } else {
-                                stadiumSelect.focus();
-                            }
-                            return;
+                            if (stadiumSelect.getAttribute('tabindex') === '-1') saveBtn.focus();
+                            else stadiumSelect.focus();
                         } else if (cur === stadiumSelect) {
-                            if (!stadiumSelect.value || stadiumSelect.value.includes('Select')) {
-                                alert('Please select a Stadium!');
-                                e.preventDefault(); return;
-                            }
+                            if (!validateStadium()) { e.preventDefault(); return; }
                             e.preventDefault();
                             saveBtn.focus();
-                            return;
                         }
                     } else {
                         // BACKWARD NAVIGATION (SHIFT + TAB) - NO VALIDATION
-                        if (cur === teamBInput) { e.preventDefault(); teamAInput.focus(); }
-                        else if (cur === dateInput) { e.preventDefault(); teamBInput.focus(); }
-                        else if (cur === timeSelect) { e.preventDefault(); dateInput.focus(); }
-                        else if (cur === stadiumSelect) { e.preventDefault(); timeSelect.focus(); }
+                        isSkippingValidation = true;
+                        e.preventDefault();
+                        if (cur === teamBInput) teamAInput.focus();
+                        else if (cur === dateInput) teamBInput.focus();
+                        else if (cur === timeSelect) dateInput.focus();
+                        else if (cur === stadiumSelect) timeSelect.focus();
                         else if (cur === saveBtn) {
-                            e.preventDefault();
                             if (stadiumSelect.getAttribute('tabindex') === '-1') timeSelect.focus();
                             else stadiumSelect.focus();
                         }
+                        // Reset skip flag after a short delay
+                        setTimeout(() => isSkippingValidation = false, 150);
                     }
                 }
 
