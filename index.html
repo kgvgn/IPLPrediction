@@ -638,7 +638,8 @@
                         <table class="data-table whitespace-nowrap w-full">
                             <thead class="bg-brand-darker/50">
                                 <tr>
-                                    <th class="!py-4">User Name</th>
+                                    <th class="!py-4">Username</th>
+                                    <th class="!py-4">Name</th>
                                     <th class="!py-4 text-center">Current PIN</th>
                                     <th class="!py-4 text-right">Action</th>
                                 </tr>
@@ -913,7 +914,19 @@
 
             const normalizedUsers = {};
             for (const name in rawUsers) {
-                normalizedUsers[name.toUpperCase().trim()] = rawUsers[name];
+                const uNameNormalized = name.toUpperCase().trim();
+                const val = rawUsers[name];
+                if (typeof val === 'object' && val !== null) {
+                    // Capitalize first letter of each word in the name
+                    if (val.name) {
+                        val.name = val.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                    }
+                    normalizedUsers[uNameNormalized] = val;
+                } else {
+                    // Fallback for old data: use the username auto-capitalized as the display name
+                    const capName = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                    normalizedUsers[uNameNormalized] = { pin: String(val), name: capName };
+                }
             }
             return { picks: Object.values(picksMap), users: normalizedUsers };
         }
@@ -1006,6 +1019,7 @@
                 if (currentUser) {
                     const normalizedCurrent = currentUser.toUpperCase();
                     myPicks = picks.filter(p => p.userName === normalizedCurrent);
+                    document.getElementById('userChip').textContent = normalizedCurrent;
                 }
             } catch (err) { console.error(err); }
         }
@@ -1152,7 +1166,7 @@
 
                 if (users[name]) {
                     // Existing user validation
-                    if (users[name] !== pin) {
+                    if (users[name].pin !== pin) {
                         alert('Incorrect PIN for this username!');
                         loginBtn.textContent = originalBtnText;
                         loginBtn.disabled = false;
@@ -1218,7 +1232,7 @@
                 const { picks: allPicks, users } = getNormalizedData(data.record);
 
                 if (pendingUser) {
-                    users[pendingUser.name] = p1;
+                    users[pendingUser.name].pin = p1;
                     const updateRes = await fetch(JSONBIN_URL, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
@@ -1379,7 +1393,7 @@
             tbody.innerHTML = leaderboardData.map(l => `
             <tr class="${l.name === currentUser ? 'bg-brand-accent/5' : ''}">
                 <td class="font-bold text-brand-accent">#${l.rank}</td>
-                <td class="font-medium">${l.name} ${l.name === currentUser ? '<span class="ml-1.5 text-[10px] bg-brand-accent text-brand-darker px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}</td>
+                <td class="font-medium">${globalUsers[l.name]?.name || l.name} ${l.name === currentUser ? '<span class="ml-1.5 text-[10px] bg-brand-accent text-brand-darker px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}</td>
                 <td class="text-brand-accent font-black text-center">${l.points.toFixed(2)}</td>
                 <td class="text-green-400 font-semibold text-center">${l.correct} / ${l.userDecisiveCount}</td>
                 <td class="text-brand-text text-center font-semibold">${l.scorePct.toFixed(2)}%</td>
@@ -1410,6 +1424,7 @@
 
             // Build datasets for each player
             const datasets = players.map((player, idx) => {
+                const displayName = globalUsers[player]?.name || player;
                 if (!chartUserColors[player]) {
                     // Generate a nice color if not yet assigned
                     const hue = (idx * 137.5) % 360; // Spread hues evenly
@@ -1428,7 +1443,8 @@
                 });
 
                 return {
-                    label: player,
+                    label: displayName,
+                    userName: player,
                     data: data,
                     borderColor: chartUserColors[player],
                     backgroundColor: chartUserColors[player] + '22', // Subtle fill
@@ -1525,13 +1541,14 @@
             `;
 
             html += players.map(player => {
+                const displayName = globalUsers[player]?.name || player;
                 const color = chartUserColors[player];
                 return `
                     <button onclick="toggleChartDataset('${player}')" id="legend-${player}"
                         class="flex items-center gap-2 px-4 py-2 rounded-full border border-brand-overlay bg-brand-overlay/20 transition-all active:bg-brand-overlay/40"
                         style="border-color: ${color}; -webkit-font-smoothing: antialiased;">
                         <div class="w-3 h-3 rounded-full shadow-[0_0_5px_${color}]" style="background-color: ${color}"></div>
-                        <span class="text-xs font-bold text-brand-primary uppercase tracking-tight">${player}</span>
+                        <span class="text-xs font-bold text-brand-primary uppercase tracking-tight">${displayName}</span>
                     </button>
                 `;
             }).join('');
@@ -1542,7 +1559,7 @@
         function syncLegendStyles() {
             if (!leaderboardChartInstance) return;
             leaderboardChartInstance.data.datasets.forEach(ds => {
-                const player = ds.label;
+                const player = ds.userName || ds.label;
                 const btn = document.getElementById(`legend-${player}`);
                 if (!btn) return;
 
@@ -1576,11 +1593,11 @@
             });
         }
 
-        function toggleChartDataset(playerName) {
+        function toggleChartDataset(uName) {
             if (!leaderboardChartInstance) return;
 
             const datasets = leaderboardChartInstance.data.datasets;
-            const dataset = datasets.find(ds => ds.label === playerName);
+            const dataset = datasets.find(ds => (ds.userName === uName || ds.label === uName));
             if (!dataset) return;
 
             if (!isComparisonMode) {
@@ -1706,7 +1723,7 @@
 
                     return `
                     <tr class="border-b border-brand-overlay last:border-0 hover:bg-brand-overlay/50 transition-colors">
-                        <td class="py-3 px-5 text-left font-medium text-brand-primary">${player}</td>
+                        <td class="py-3 px-5 text-left font-medium text-brand-primary">${globalUsers[player]?.name || player}</td>
                         <td class="py-3 px-5 text-right ${textColor}">${pickStr}</td>
                     </tr>
                 `;
@@ -2246,8 +2263,12 @@
             let html = `
                 <tr class="bg-brand-accent/5 border-b-2 border-brand-accent/20">
                     <td class="py-4 px-4">
-                        <input type="text" id="newUserName" placeholder="Enter New Name..." 
-                            class="w-full bg-brand-darker border border-brand-overlay text-brand-primary rounded-lg px-3 py-2 text-sm focus:border-brand-accent outline-none font-bold uppercase"
+                        <input type="text" id="newUserName" placeholder="Username (login)" 
+                            class="w-full bg-brand-darker border border-brand-overlay text-brand-primary rounded-lg px-3 py-2 text-sm focus:border-brand-accent outline-none font-bold uppercase">
+                    </td>
+                    <td class="py-4 px-4">
+                        <input type="text" id="newDisplayName" placeholder="Display Name" 
+                            class="w-full bg-brand-darker border border-brand-overlay text-brand-primary rounded-lg px-3 py-2 text-sm focus:border-brand-accent outline-none font-bold"
                             onkeydown="if(event.key==='Enter') addAdminUser()">
                     </td>
                     <td class="py-4 text-center">
@@ -2263,10 +2284,16 @@
             `;
 
             // Existing Users
-            html += usersList.map(userName => `
+            html += usersList.map(userName => {
+                const user = globalUsers[userName];
+                const displayName = user.name || userName;
+                const pin = user.pin || user; // Support both old and new formats in display
+                
+                return `
                 <tr class="border-b border-brand-overlay/50 last:border-0 hover:bg-brand-overlay/10 transition-colors">
                     <td class="py-4 px-4 font-bold text-sm text-brand-primary uppercase">${userName}</td>
-                    <td class="py-4 text-center font-mono text-brand-accent text-sm font-bold tracking-widest">${globalUsers[userName]}</td>
+                    <td class="py-4 px-4 font-medium text-sm text-brand-text">${displayName}</td>
+                    <td class="py-4 text-center font-mono text-brand-accent text-sm font-bold tracking-widest">${pin}</td>
                     <td class="py-4 text-right pr-4">
                         <button onclick="resetUserPin('${userName}')" 
                             class="text-[9px] font-bold text-brand-text uppercase border border-brand-overlay px-2 py-1.5 rounded-lg hover:border-brand-accent hover:text-brand-accent transition-all">
@@ -2274,23 +2301,28 @@
                         </button>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
 
             tbody.innerHTML = html;
         }
 
         async function addAdminUser() {
-            const nameInput = document.getElementById('newUserName');
-            const name = nameInput.value.trim().toUpperCase();
-            if (!name) { alert('Enter user name'); return; }
-            if (globalUsers[name]) { alert('User already exists'); return; }
+            const userNameInput = document.getElementById('newUserName');
+            const displayNameInput = document.getElementById('newDisplayName');
+            const uName = userNameInput.value.trim().toUpperCase();
+            const dName = displayNameInput.value.trim();
+
+            if (!uName) { alert('Enter username'); return; }
+            if (!dName) { alert('Enter display name'); return; }
+            if (globalUsers[uName]) { alert('User already exists'); return; }
 
             try {
                 const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
                 const data = await res.json();
                 const { picks: allPicks, users } = getNormalizedData(data.record);
 
-                users[name] = "0000"; // Default PIN
+                users[uName] = { pin: "0000", name: dName };
 
                 const updateRes = await fetch(JSONBIN_URL, {
                     method: 'PUT',
@@ -2300,9 +2332,10 @@
 
                 if (updateRes.ok) {
                     globalUsers = users;
-                    nameInput.value = '';
+                    userNameInput.value = '';
+                    displayNameInput.value = '';
                     renderAdminUsersView();
-                    alert(`User ${name} added with PIN 0000`);
+                    alert(`User ${uName} added with display name "${dName}" and PIN 0000`);
                 } else {
                     alert('Failed to add user');
                 }
@@ -2320,7 +2353,9 @@
                 const data = await res.json();
                 const { picks: allPicks, users } = getNormalizedData(data.record);
 
-                users[userName] = "0000";
+                if (users[userName]) {
+                    users[userName].pin = "0000";
+                }
 
                 const updateRes = await fetch(JSONBIN_URL, {
                     method: 'PUT',
