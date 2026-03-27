@@ -1486,7 +1486,7 @@
             const container = document.getElementById('teamFilters');
             if (!container) return;
 
-            const teams = ['All', ...Object.values(TEAM_ABBR)];
+            const teams = ['All', ...new Set(Object.values(TEAM_ABBR))];
             container.innerHTML = teams.map(team => {
                 if (team === 'All') {
                     return `<button class="team-filter-item active" data-team="All"><span class="team-filter-all">All</span></button>`;
