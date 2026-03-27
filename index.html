@@ -258,9 +258,23 @@
             scrollbar-width: none;
         }
 
-        .visible-scrollbar::-webkit-scrollbar { height: 7px; width: 7px; display: block; }
-        .visible-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); border-radius: 10px; }
-        .visible-scrollbar::-webkit-scrollbar-thumb { background: #f97316; border-radius: 10px; border: 1.5px solid #111827; box-shadow: 0 0 10px rgba(249, 115, 22, 0.3); }
+        .visible-scrollbar::-webkit-scrollbar {
+            height: 7px;
+            width: 7px;
+            display: block;
+        }
+
+        .visible-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+        }
+
+        .visible-scrollbar::-webkit-scrollbar-thumb {
+            background: #f97316;
+            border-radius: 10px;
+            border: 1.5px solid #111827;
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.3);
+        }
 
         .themed-chip {
             background-color: var(--bg-surface);
@@ -425,7 +439,8 @@
                     Completed<br>Matches: 0</div>
             </section>
             <div class="px-0 sm:px-5">
-                <div class="bg-brand-muted rounded-2xl border border-brand-overlay overflow-hidden h-auto lg:h-auto shadow-xl">
+                <div
+                    class="bg-brand-muted rounded-2xl border border-brand-overlay overflow-hidden h-auto lg:h-auto shadow-xl">
                     <div class="overflow-x-auto visible-scrollbar">
                         <table class="data-table whitespace-nowrap">
                             <thead>
@@ -449,10 +464,13 @@
                 </div>
 
                 <!-- Leaderboard Progress Graph -->
-                <div class="mt-8 bg-brand-muted rounded-2xl border border-brand-overlay py-3 px-0 lg:px-6 shadow-xl h-auto flex flex-col">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-2 lg:mb-4 gap-2 px-4 lg:px-0 flex-shrink-0">
+                <div
+                    class="mt-8 bg-brand-muted rounded-2xl border border-brand-overlay py-3 px-0 lg:px-6 shadow-xl h-auto flex flex-col">
+                    <div
+                        class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-2 lg:mb-4 gap-2 px-4 lg:px-0 flex-shrink-0">
                         <div>
-                            <h3 class="text-base lg:text-lg font-bold text-brand-primary leading-tight">Win Progression</h3>
+                            <h3 class="text-base lg:text-lg font-bold text-brand-primary leading-tight">Win Progression
+                            </h3>
                             <p class="text-[10px] lg:text-xs text-brand-text">Performance over completed matches.</p>
                         </div>
                     </div>
@@ -462,11 +480,14 @@
                         <div class="lg:w-[260px] order-1 flex flex-col gap-2 px-4 lg:px-0 flex-shrink-0">
                             <!-- Player Selector -->
                             <div class="flex flex-col gap-1.5 lg:gap-2 relative" id="playerPicker">
-                                <span class="text-[10px] text-brand-text font-black uppercase tracking-[0.2em] px-1">Compare Players:</span>
+                                <span
+                                    class="text-[10px] text-brand-text font-black uppercase tracking-[0.2em] px-1">Compare
+                                    Players:</span>
                                 <button onclick="togglePlayerDropdown()"
                                     class="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-brand-darker border border-brand-overlay text-xs font-bold text-brand-primary hover:border-brand-accent transition-all active:scale-[0.98] group shadow-lg">
                                     <div class="flex items-center gap-2.5">
-                                        <span class="material-symbols-outlined text-brand-accent text-lg">person_add</span>
+                                        <span
+                                            class="material-symbols-outlined text-brand-accent text-lg">person_add</span>
                                         <span>Select Names</span>
                                     </div>
                                     <span class="material-symbols-outlined text-lg opacity-40">expand_more</span>
@@ -516,7 +537,8 @@
                         <!-- 2. Main Graph Area (Right) -->
                         <div class="flex-1 min-w-0 order-2 flex flex-col h-full overflow-hidden">
                             <!-- Chart Container: Stretching to edges -->
-                            <div class="bg-brand-darker/20 border-y lg:border border-brand-overlay/50 lg:rounded-2xl p-0.5 relative shadow-inner overflow-x-auto overflow-y-hidden visible-scrollbar flex-1 px-0">
+                            <div
+                                class="bg-brand-darker/20 border-y lg:border border-brand-overlay/50 lg:rounded-2xl p-0.5 relative shadow-inner overflow-x-auto overflow-y-hidden visible-scrollbar flex-1 px-0">
                                 <div id="chartScrollWrapper" class="h-[300px] lg:h-[400px]">
                                     <canvas id="leaderboardChart"></canvas>
                                 </div>
@@ -526,10 +548,12 @@
                             <div class="mt-1.5 lg:mt-3 px-4 lg:px-0 flex-shrink-0">
                                 <div class="flex items-center gap-2 mb-1.5 lg:mb-2">
                                     <div class="h-px bg-brand-overlay flex-1"></div>
-                                    <span class="text-[9px] text-brand-text font-black uppercase tracking-[0.2em] px-2">Selection</span>
+                                    <span
+                                        class="text-[9px] text-brand-text font-black uppercase tracking-[0.2em] px-2">Selection</span>
                                     <div class="h-px bg-brand-overlay flex-1"></div>
                                 </div>
-                                <div id="chartLegend" class="flex flex-wrap gap-1.5 items-center justify-center max-h-[100px] overflow-hidden">
+                                <div id="chartLegend"
+                                    class="flex flex-wrap gap-1.5 items-center justify-center max-h-[100px] overflow-hidden">
                                     <!-- JS Injected Chips -->
                                 </div>
                             </div>
@@ -613,8 +637,10 @@
             </section>
             <div class="px-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <!-- Nice Leaderboard Button -->
-                <button onclick="switchView('nice-leaderboard')" class="themed-card rounded-2xl p-8 flex flex-col items-center gap-4 hover:border-brand-accent transition-all active:scale-95 group shadow-2xl">
-                    <div class="w-20 h-20 bg-brand-accent/10 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <button onclick="switchView('nice-leaderboard')"
+                    class="themed-card rounded-2xl p-8 flex flex-col items-center gap-4 hover:border-brand-accent transition-all active:scale-95 group shadow-2xl">
+                    <div
+                        class="w-20 h-20 bg-brand-accent/10 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
                         <span class="material-symbols-outlined text-brand-accent text-5xl">leaderboard</span>
                     </div>
                     <div class="text-center">
@@ -623,8 +649,10 @@
                     </div>
                 </button>
                 <!-- Nice Results Button -->
-                <button onclick="switchView('nice-results')" class="themed-card rounded-2xl p-8 flex flex-col items-center gap-4 hover:border-brand-accent transition-all active:scale-95 group shadow-2xl">
-                    <div class="w-20 h-20 bg-green-400/10 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <button onclick="switchView('nice-results')"
+                    class="themed-card rounded-2xl p-8 flex flex-col items-center gap-4 hover:border-brand-accent transition-all active:scale-95 group shadow-2xl">
+                    <div
+                        class="w-20 h-20 bg-green-400/10 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
                         <span class="material-symbols-outlined text-green-400 text-5xl">fact_check</span>
                     </div>
                     <div class="text-center">
@@ -642,28 +670,32 @@
                     <p class="text-brand-text text-[11px] lg:text-sm">Rankings for the Nice Group only.</p>
                 </div>
                 <div class="flex items-center justify-between w-full lg:w-auto lg:gap-3 lg:pb-0.5">
-                    <button onclick="switchView('nice-results')" 
+                    <button onclick="switchView('nice-results')"
                         class="text-[9px] lg:text-[10px] whitespace-nowrap font-black text-brand-primary uppercase tracking-widest flex items-center gap-1 bg-brand-primary/10 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg border border-brand-primary/20 hover:bg-brand-primary/20 transition-all active:scale-95">
-                        <span class="material-symbols-outlined text-[14px] lg:text-sm leading-none">fact_check</span> Results
+                        <span class="material-symbols-outlined text-[14px] lg:text-sm leading-none">fact_check</span>
+                        Results
                     </button>
-                    <div class="text-[9px] lg:text-xs text-brand-text font-bold uppercase text-right leading-tight" id="niceLeaderboardMatchesCount">
+                    <div class="text-[9px] lg:text-xs text-brand-text font-bold uppercase text-right leading-tight"
+                        id="niceLeaderboardMatchesCount">
                         Completed<br>Matches: 0</div>
                 </div>
             </section>
             <div class="px-0 sm:px-5">
-                <div class="bg-brand-muted rounded-2xl border border-brand-overlay overflow-hidden h-auto lg:h-auto shadow-xl">
+                <div
+                    class="bg-brand-muted rounded-2xl border border-brand-overlay overflow-hidden h-auto lg:h-auto shadow-xl">
                     <div class="overflow-x-auto visible-scrollbar">
                         <table class="data-table whitespace-nowrap">
                             <thead>
                                 <tr>
                                     <th>Rank</th>
                                     <th>Player</th>
-                                    <th class="text-center sortable" onclick="sortLeaderboard('points', true)">Points <span
-                                            id="nice-sort-points" class="text-[8px] ml-1">▼</span></th>
+                                    <th class="text-center sortable" onclick="sortLeaderboard('points', true)">Points
+                                        <span id="nice-sort-points" class="text-[8px] ml-1">▼</span></th>
                                     <th class="text-center sortable" onclick="sortLeaderboard('correct', true)">Wins
                                         <span id="nice-sort-correct" class="text-[8px] ml-1 hidden"></span>
                                     </th>
-                                    <th class="text-center sortable" onclick="sortLeaderboard('scorePct', true)">Accuracy %
+                                    <th class="text-center sortable" onclick="sortLeaderboard('scorePct', true)">
+                                        Accuracy %
                                         <span id="nice-sort-scorePct" class="text-[8px] ml-1 hidden"></span>
                                     </th>
                                 </tr>
@@ -675,10 +707,13 @@
                 </div>
 
                 <!-- Nice Progress Graph -->
-                <div class="mt-8 bg-brand-muted rounded-2xl border border-brand-overlay py-3 px-0 lg:px-6 shadow-xl h-auto flex flex-col">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-2 lg:mb-4 gap-2 px-4 lg:px-0 flex-shrink-0">
+                <div
+                    class="mt-8 bg-brand-muted rounded-2xl border border-brand-overlay py-3 px-0 lg:px-6 shadow-xl h-auto flex flex-col">
+                    <div
+                        class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-2 lg:mb-4 gap-2 px-4 lg:px-0 flex-shrink-0">
                         <div>
-                            <h3 class="text-base lg:text-lg font-bold text-brand-primary leading-tight">Win Progression (Nice Group)</h3>
+                            <h3 class="text-base lg:text-lg font-bold text-brand-primary leading-tight">Win Progression
+                                (Nice Group)</h3>
                             <p class="text-[10px] lg:text-xs text-brand-text">Performance over completed matches.</p>
                         </div>
                     </div>
@@ -688,11 +723,14 @@
                         <div class="lg:w-[260px] order-1 flex flex-col gap-2 px-4 lg:px-0 flex-shrink-0">
                             <!-- Player Selector -->
                             <div class="flex flex-col gap-1.5 lg:gap-2 relative" id="nicePlayerPicker">
-                                <span class="text-[10px] text-brand-text font-black uppercase tracking-[0.2em] px-1">Compare Players:</span>
+                                <span
+                                    class="text-[10px] text-brand-text font-black uppercase tracking-[0.2em] px-1">Compare
+                                    Players:</span>
                                 <button onclick="togglePlayerDropdown(true)"
                                     class="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-brand-darker border border-brand-overlay text-xs font-bold text-brand-primary hover:border-brand-accent transition-all active:scale-[0.98] group shadow-lg">
                                     <div class="flex items-center gap-2.5">
-                                        <span class="material-symbols-outlined text-brand-accent text-lg">person_add</span>
+                                        <span
+                                            class="material-symbols-outlined text-brand-accent text-lg">person_add</span>
                                         <span>Select Names</span>
                                     </div>
                                     <span class="material-symbols-outlined text-lg opacity-40">expand_more</span>
@@ -742,7 +780,8 @@
                         <!-- 2. Main Graph Area (Right) -->
                         <div class="flex-1 min-w-0 order-2 flex flex-col h-full overflow-hidden">
                             <!-- Chart Container: Stretching to edges -->
-                            <div class="bg-brand-darker/20 border-y lg:border border-brand-overlay/50 lg:rounded-2xl p-0.5 relative shadow-inner overflow-x-auto overflow-y-hidden visible-scrollbar flex-1 px-0">
+                            <div
+                                class="bg-brand-darker/20 border-y lg:border border-brand-overlay/50 lg:rounded-2xl p-0.5 relative shadow-inner overflow-x-auto overflow-y-hidden visible-scrollbar flex-1 px-0">
                                 <div id="niceChartScrollWrapper" class="h-[300px] lg:h-[400px]">
                                     <canvas id="niceLeaderboardChart"></canvas>
                                 </div>
@@ -752,10 +791,12 @@
                             <div class="mt-1.5 lg:mt-3 px-4 lg:px-0 flex-shrink-0">
                                 <div class="flex items-center gap-2 mb-1.5 lg:mb-2">
                                     <div class="h-px bg-brand-overlay flex-1"></div>
-                                    <span class="text-[9px] text-brand-text font-black uppercase tracking-[0.2em] px-2">Selection</span>
+                                    <span
+                                        class="text-[9px] text-brand-text font-black uppercase tracking-[0.2em] px-2">Selection</span>
                                     <div class="h-px bg-brand-overlay flex-1"></div>
                                 </div>
-                                <div id="niceChartLegend" class="flex flex-wrap gap-1.5 items-center justify-center max-h-[100px] overflow-hidden">
+                                <div id="niceChartLegend"
+                                    class="flex flex-wrap gap-1.5 items-center justify-center max-h-[100px] overflow-hidden">
                                     <!-- JS Injected Chips -->
                                 </div>
                             </div>
@@ -774,11 +815,14 @@
                         <p class="text-brand-text text-[11px] lg:text-sm">Your group performance.</p>
                     </div>
                     <div class="flex items-center justify-between w-full lg:w-auto lg:gap-3 lg:pb-0.5">
-                        <button onclick="switchView('nice-leaderboard')" 
+                        <button onclick="switchView('nice-leaderboard')"
                             class="text-[9px] lg:text-[10px] whitespace-nowrap font-black text-green-400 uppercase tracking-widest flex items-center gap-1 bg-green-400/10 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg border border-green-400/20 hover:bg-green-400/20 transition-all active:scale-95">
-                            <span class="material-symbols-outlined text-[14px] lg:text-sm leading-none">leaderboard</span> Leaderboard
+                            <span
+                                class="material-symbols-outlined text-[14px] lg:text-sm leading-none">leaderboard</span>
+                            Leaderboard
                         </button>
-                        <div class="text-[9px] lg:text-xs text-brand-text font-bold uppercase text-right leading-tight" id="nicePerformanceMatchesCount">
+                        <div class="text-[9px] lg:text-xs text-brand-text font-bold uppercase text-right leading-tight"
+                            id="nicePerformanceMatchesCount">
                             Completed<br>Matches: 0</div>
                     </div>
                 </div>
@@ -808,7 +852,8 @@
                     </div>
                     <div class="bg-brand-muted rounded-xl border border-brand-overlay p-2 text-center">
                         <div class="text-lg font-extrabold text-brand-accent" id="nice-resPoints">0</div>
-                        <div class="text-[12px] text-brand-text uppercase tracking-tighter font-bold mt-1">TOTAL POINTS</div>
+                        <div class="text-[12px] text-brand-text uppercase tracking-tighter font-bold mt-1">TOTAL POINTS
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1006,10 +1051,13 @@
             </svg>
             <span class="text-[10px] font-bold">Results</span>
         </a>
-        <a id="nav-item-nice" class="bottom-nav-item flex flex-col items-center gap-1 text-brand-text hover:text-brand-primary transition-colors hidden"
+        <a id="nav-item-nice"
+            class="bottom-nav-item flex flex-col items-center gap-1 text-brand-text hover:text-brand-primary transition-colors hidden"
             href="#" onclick="switchView('nice'); return false;">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path
+                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                    stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
             <span class="text-[10px] font-bold">Nice</span>
         </a>
@@ -1200,9 +1248,9 @@
     <script>
         // ─── GLOBALS ──────────────────────────
         let currentUser = localStorage.getItem('ipl_username') || null;
-        const NICE_USERS = ['GOPI', 'CHANDU', 'DP', 'SRINI', 'TD', 'ABHIJITH', 'ABHISHEK', 'RAVI', 'RK', 'SHRAVAN', 'TEJA', 'KISHORE', 'SANTHOSH', 'MADHAN', 'NEELIMA'];
+        const NICE_USERS = ['GOPI', 'CHANDU', 'DP', 'RAJU', 'SRINI', 'DHANRAJ', 'ABHIJITH', 'ABHISHEK', 'RAVI', 'SHRAVAN', 'TEJA', 'KISHORE', 'SANTU', 'MADHAN', 'NEELIMA', 'GOLLA'];
         const NICE_USERS_SET = new Set(NICE_USERS);
-        
+
         let memoizedStats = {
             userFirstMatchIdxMap: {},
             niceMatchPointsMap: {}, // matchId -> { ptsPerWinner, eligibleUsernames }
@@ -1213,7 +1261,7 @@
             if (!scheduleData.length || !globalAllPicks.length) return;
 
             memoizedStats.decisiveMatches = scheduleData.filter(m => m.winner !== null && m.winner !== 'No Result');
-            
+
             const firstMatchIdxMap = {};
             globalAllPicks.forEach(p => {
                 if (p.userName === 'ADMIN') return;
@@ -1228,16 +1276,16 @@
 
             const niceMatchPointsMap = {};
             const nicePlayersList = [...new Set(globalAllPicks.map(p => p.userName))].filter(u => u !== 'ADMIN' && NICE_USERS_SET.has(u.toUpperCase()));
-            
+
             memoizedStats.decisiveMatches.forEach(m => {
                 const mIdx = scheduleData.findIndex(sm => sm.id === m.id);
                 const eligibleInGroup = nicePlayersList.filter(u => firstMatchIdxMap[u] <= mIdx);
                 const groupPool = eligibleInGroup.length * 100;
-                
+
                 const groupPicks = globalAllPicks.filter(gp => gp.matchId === m.id && NICE_USERS_SET.has(gp.userName.toUpperCase()));
                 const groupWinners = groupPicks.filter(gp => gp.team === m.winner).length;
                 const ptsPerWinner = groupWinners > 0 ? (groupPool / groupWinners) : 0;
-                
+
                 niceMatchPointsMap[m.id] = { ptsPerWinner, eligibleInGroup };
             });
             memoizedStats.niceMatchPointsMap = niceMatchPointsMap;
@@ -1686,7 +1734,7 @@
                 if (isNice) {
                     playersList = playersList.filter(u => NICE_USERS_SET.has(u.toUpperCase()));
                 }
-                
+
                 // Consumed Pre-calculated User Stats
                 const userStats = {};
                 playersList.forEach(u => {
@@ -1702,7 +1750,7 @@
                         if (p.team === winner) {
                             userStats[p.userName].correct++;
                         }
-                        
+
                         if (isNice) {
                             const matchStat = memoizedStats.niceMatchPointsMap[p.matchId];
                             if (matchStat) {
@@ -2067,7 +2115,7 @@
         function filterPlayerOptions(isNice = false) {
             const searchId = isNice ? 'nicePlayerSearch' : 'playerSearch';
             const listId = isNice ? 'nicePlayerOptionsList' : 'playerOptionsList';
-            
+
             const search = document.getElementById(searchId).value.toLowerCase();
             const items = document.querySelectorAll(`#${listId} .player-option-item`);
             items.forEach(item => {
@@ -2204,7 +2252,7 @@
 
             const matchPicks = globalAllPicks.filter(p => p.matchId === matchId && (isNice ? NICE_USERS_SET.has(p.userName.toUpperCase()) : true));
             const currentMatchIdx = scheduleData.findIndex(sm => sm.id === matchId);
-            
+
             let validPlayers = [];
             let eligibleCount = 0;
 
@@ -2595,7 +2643,7 @@
                 }
 
                 let pts = myPick && myPick.points !== undefined ? Number(myPick.points.toFixed(2)) : 0;
-                
+
                 if (isNice && m.winner !== null && m.winner !== 'No Result') {
                     const matchStat = memoizedStats.niceMatchPointsMap[m.id];
                     if (matchStat) {
@@ -2651,7 +2699,7 @@
 
             if (elCorrect) elCorrect.textContent = correct;
             if (elWrong) elWrong.textContent = wrong;
-            
+
             let totalPoints = 0;
             if (isNice) {
                 pastMatches.forEach(m => {
@@ -2668,7 +2716,7 @@
             } else {
                 totalPoints = globalAllPicks.filter(p => p.userName === currentUser).reduce((sum, p) => sum + (p.points || 0), 0);
             }
-            
+
             if (elPoints) elPoints.textContent = totalPoints.toFixed(2);
 
             // Per-user accuracy numerator: matches played by THIS user
