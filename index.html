@@ -2512,7 +2512,7 @@
             updateCountdowns();
         }
 
-        // ─── SUBMIT PICK (direct button) ──────────────────────────
+        // ─── SUBMIT PICK (direct button) with retry-verification ──────────────────────────
         async function submitPickDirect(matchId, team) {
             if (!currentUser) { promptLogin(); return; }
 
@@ -2527,30 +2527,61 @@
                 }
             }
 
-            try {
-                const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-                const currentData = await res.json();
-                let { picks: allPicks, users } = getNormalizedData(currentData.record);
+            const MAX_RETRIES = 3;
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    // 1. Read latest data
+                    const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+                    const currentData = await res.json();
+                    let { picks: allPicks, users } = getNormalizedData(currentData.record);
 
-                allPicks = allPicks.filter(p => !(p.userName === currentUser && p.matchId === matchId));
-                allPicks.push({ userName: currentUser, matchId, team, frozen: true, timestamp: new Date().toISOString() });
+                    // 2. Add/update our pick
+                    allPicks = allPicks.filter(p => !(p.userName === currentUser && p.matchId === matchId));
+                    allPicks.push({ userName: currentUser, matchId, team, frozen: true, timestamp: new Date().toISOString() });
 
-                const saveRes = await fetch(JSONBIN_URL, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                    body: JSON.stringify({ picks: allPicks, users: users })
-                });
+                    // 3. Write back
+                    const saveRes = await fetch(JSONBIN_URL, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                        body: JSON.stringify({ picks: allPicks, users: users })
+                    });
 
-                if (saveRes.ok) {
-                    await fetchMyPicks();
-                    renderUpcomingMatches();
-                } else {
-                    alert('Failed to submit pick.');
+                    if (!saveRes.ok) {
+                        alert('Failed to submit pick.');
+                        return;
+                    }
+
+                    // 4. Verify: re-read and confirm our pick exists
+                    const verifyRes = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+                    const verifyData = await verifyRes.json();
+                    const { picks: verifiedPicks, users: verifiedUsers } = getNormalizedData(verifyData.record);
+                    const ourPick = verifiedPicks.find(p => p.userName === currentUser && p.matchId === matchId && p.team === team);
+
+                    if (ourPick) {
+                        // 5. Pick confirmed — reuse verified data for local state (no extra fetch needed)
+                        globalAllPicks = verifiedPicks;
+                        globalUsers = verifiedUsers;
+                        globalAllPlayers = new Set(verifiedPicks.map(p => p.userName));
+                        myPicks = verifiedPicks.filter(p => p.userName === currentUser);
+                        precalculateStats();
+                        renderUpcomingMatches();
+                        console.log(`Pick saved & verified on attempt ${attempt}`);
+                        return;
+                    }
+
+                    // 6. Pick was overwritten by concurrent write — retry
+                    console.warn(`Pick verification failed (attempt ${attempt}/${MAX_RETRIES}), retrying...`);
+                } catch (e) {
+                    console.error(`Pick submission error (attempt ${attempt}):`, e);
+                    if (attempt === MAX_RETRIES) {
+                        alert('Network error. Please try again.');
+                        return;
+                    }
                 }
-            } catch (e) {
-                console.error(e);
-                alert('Network error.');
             }
+
+            // All retries exhausted
+            alert('Your prediction could not be saved after multiple attempts. Please try again.');
         }
 
 
