@@ -1277,7 +1277,7 @@
     <script>
         // ─── GLOBALS ──────────────────────────
         let currentUser = localStorage.getItem('ipl_username') || null;
-        const NICE_USERS = ['GOPI', 'CHANDU', 'DP', 'RAJU', 'SRINI', 'DHANRAJ', 'ABHIJIT', 'ABHISHEK', 'RAVI', 'SHRAVAN', 'TEJA', 'KISHORE', 'SANTU', 'MADHAN', 'NEELIMA', 'GOLLA'];
+        const NICE_USERS = ['GOPI', 'CHANDU', 'DP', 'RAJU', 'SRINI', 'DHANRAJ', 'ABHIJIT', 'SHRAVAN', 'TEJA', 'KISHORE', 'SANTU', 'NEELIMA', 'GOLLA'];
         const NICE_USERS_SET = new Set(NICE_USERS);
 
         let memoizedStats = {
@@ -1474,16 +1474,19 @@
                 const { picks: picksMain, users } = getNormalizedData(dataMain.record);
                 const { picks: picksArchive } = getNormalizedData(dataArchive.record || {});
 
-                // Combine picks - the UI uses globalAllPicks for leaderboard and my history
-                const combinedPicks = [...picksArchive, ...picksMain];
-
-                globalAllPicks = combinedPicks;
+                // Combine and de-duplicate picks (preferring main bin if duplicate exists)
+                const picksMap = new Map();
+                [...picksArchive, ...picksMain].forEach(p => {
+                    const key = `${p.userName}|${p.matchId}`;
+                    picksMap.set(key, p);
+                });
+                globalAllPicks = Array.from(picksMap.values());
                 globalUsers = users; // Users are strictly in Main Bin for easier login management
-                globalAllPlayers = new Set(combinedPicks.map(p => p.userName));
+                globalAllPlayers = new Set(globalAllPicks.map(p => p.userName));
 
                 if (currentUser) {
                     const normalizedCurrent = currentUser.toUpperCase();
-                    myPicks = combinedPicks.filter(p => p.userName === normalizedCurrent);
+                    myPicks = globalAllPicks.filter(p => p.userName === normalizedCurrent);
                     document.getElementById('userChip').textContent = normalizedCurrent;
                     updateNiceNavVisibility();
                 }
