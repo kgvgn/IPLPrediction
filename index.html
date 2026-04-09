@@ -392,14 +392,14 @@
             <h1 class="text-lg font-bold tracking-tight">Predictor</h1>
         </div>
         <div class="flex items-center gap-3">
-            <!-- Refined Theme Toggle Button -->
-            <button class="theme-toggle-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">
-                <div class="icon-wrapper">
-                    <span class="sun-icon material-symbols-outlined !text-orange-400">light_mode</span>
-                    <span class="moon-icon material-symbols-outlined !text-indigo-400">dark_mode</span>
-                </div>
+            <button onclick="forceSync()" id="syncBtn" class="p-2 rounded-xl bg-brand-overlay/20 hover:bg-brand-overlay/40 text-brand-text/70 hover:text-brand-accent transition-all active:scale-90 relative group" title="Force Sync Data">
+                <span class="material-symbols-outlined text-xl">sync</span>
+                <div class="absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-900 text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-brand-overlay z-50">Force Sync</div>
             </button>
-            <div class="flex items-center gap-2">
+            <button id="themeToggle" onclick="toggleTheme()" class="p-2 sm:p-3 rounded-2xl bg-brand-overlay/20 hover:bg-brand-overlay/40 text-brand-accent transition-all active:scale-95 shadow-lg border border-brand-overlay/50">
+                <span class="material-symbols-outlined text-xl sm:text-2xl" id="themeIcon">dark_mode</span>
+            </button>
+            <div id="userChipContainer" onclick="switchView('profile')" class="flex items-center gap-2 sm:gap-3 bg-brand-overlay/20 hover:bg-brand-overlay/40 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl cursor-pointer transition-all border border-brand-overlay/50 group active:scale-95">
                 <span class="text-xs font-medium cursor-pointer themed-text" id="userChip"
                     onclick="promptLogin()">Guest</span>
                 <div class="w-9 h-9 rounded-full border-2 border-brand-accent/30 flex items-center justify-center overflow-hidden cursor-pointer themed-card"
@@ -1338,7 +1338,14 @@
 
         const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/69b51614b7ec241ddc693348';
         const SCHEDULE_BIN_URL = 'https://api.jsonbin.io/v3/b/69b89f95aa77b81da9eefef2';
-        const ARCHIVE_BIN_URL = 'https://api.jsonbin.io/v3/b/69cfb0ec36566621a876c870';
+        const ARCHIVE_BIN_URLS = [
+            'https://api.jsonbin.io/v3/b/69cfb0ec36566621a876c870', // Primary Archive
+            'https://api.jsonbin.io/v3/b/69d72e5f856a682189136054', // Overflow 1
+            'https://api.jsonbin.io/v3/b/69d72e77856a682189136094', // Overflow 2
+            'https://api.jsonbin.io/v3/b/69d72ea436566621a892ab8c', // Overflow 3
+            'https://api.jsonbin.io/v3/b/69d72ec6aaba882197dba32d'  // Overflow 4
+        ];
+        const LEADERBOARD_CACHE_BIN_URL = 'https://api.jsonbin.io/v3/b/69d72ed336566621a892ac37';
         const MASTER_KEY = '$2a$10$aYtY9fT6R2RECjwsJcmDKeEUlKPfuC8NgeDISmj/j8ruTZLHyoOHO';
 
         function getNormalizedData(record) {
@@ -1389,6 +1396,77 @@
             return { picks: Object.values(picksMap), users: normalizedUsers };
         }
 
+        /**
+         * Enhanced fetch that handles local caching and 429 rate limit retries.
+         */
+        async function smartFetch(url, options = {}, cacheTtl = 300000) {
+            const cacheKey = `ipl_cache_${url}`;
+            const now = Date.now();
+
+            // 1. Check Cache (Only for GET requests)
+            // Skip cache if cacheTtl is explicitly 0
+            if (cacheTtl > 0 && (!options.method || options.method === 'GET')) {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const { data, timestamp } = JSON.parse(cached);
+                        if (now - timestamp < cacheTtl) {
+                            return { 
+                                ok: true, 
+                                status: 200,
+                                fromCache: true,
+                                json: async () => data,
+                                text: async () => JSON.stringify(data)
+                            };
+                        }
+                    } catch (e) { localStorage.removeItem(cacheKey); }
+                }
+            }
+
+            // 2. Perform Fetch with Retry Logic
+            let attempts = 0;
+            const maxAttempts = 3;
+            const initialDelay = 2000;
+
+            while (attempts < maxAttempts) {
+                try {
+                    const res = await fetch(url, options);
+                    
+                    if (res.status === 429) {
+                        attempts++;
+                        const delay = initialDelay * Math.pow(2, attempts - 1) + (Math.random() * 1000);
+                        console.warn(`Rate limited (429) for ${url}. Retrying in ${Math.round(delay)}ms...`);
+                        await new Promise(r => setTimeout(r, delay));
+                        continue;
+                    }
+
+                    // 3. Clear Cache on Mutation
+                    if (options.method && ['PUT', 'POST', 'DELETE'].includes(options.method.toUpperCase())) {
+                        localStorage.removeItem(cacheKey);
+                    }
+
+                    if (res.ok && (!options.method || options.method === 'GET')) {
+                        const data = await res.json();
+                        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: now }));
+                        // Return custom response-like object to keep existing .json() calls working
+                        return { 
+                            ok: true, 
+                            status: res.status,
+                            fromCache: false,
+                            json: async () => data,
+                            text: async () => JSON.stringify(data)
+                        };
+                    }
+
+                    return res; // Return original response for non-GET or non-OK
+                } catch (err) {
+                    attempts++;
+                    if (attempts >= maxAttempts) throw err;
+                    await new Promise(r => setTimeout(r, initialDelay * attempts));
+                }
+            }
+        }
+
         const TEAM_ABBR = {
             'Mumbai Indians': 'MI', 'Chennai Super Kings': 'CSK', 'Kolkata Knight Riders': 'KKR',
             'Sunrisers Hyderabad': 'SRH', 'Royal Challengers Bangalore': 'RCB', 'Royal Challengers Bengaluru': 'RCB',
@@ -1436,6 +1514,40 @@
         }
 
         // ─── INIT ──────────────────────────
+        async function forceSync() {
+            const btn = document.getElementById('syncBtn');
+            btn.querySelector('span').classList.add('animate-spin');
+            btn.disabled = true;
+            
+            try {
+                // Clear all ipl_cache_ keys
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('ipl_cache_')) {
+                        localStorage.removeItem(key);
+                        i--; // Adjust index after removal
+                    }
+                }
+                
+                // Re-fetch everything with cache disabled
+                await fetchLeaderboardCache(0);
+                await fetchSchedule(0);
+                await fetchMyPicks(0);
+                await fetchH2H();
+                
+                renderUpcomingMatches();
+                if (currentUser === 'ADMIN') renderAdminView();
+                renderLeaderboard();
+                
+            } catch (e) { console.error(e); }
+            finally {
+                setTimeout(() => {
+                    btn.querySelector('span').classList.remove('animate-spin');
+                    btn.disabled = false;
+                }, 1000);
+            }
+        }
+
         async function init() {
             initTheme();
             if (!currentUser) promptLogin();
@@ -1444,50 +1556,96 @@
                 if (currentUser === 'ADMIN') switchView('admin');
             }
 
-            await Promise.all([fetchSchedule(), fetchMyPicks(), fetchH2H()]);
-            precalculateStats(); // Final sync
-            renderUpcomingMatches();
+            // Fast path: Load leaderboard from cache first
+            await fetchLeaderboardCache();
+
+            // Stagger remaining loads to avoid rate limits (429)
+            setTimeout(async () => {
+                await fetchSchedule();
+                renderUpcomingMatches();
+            }, 500);
+
+            setTimeout(async () => {
+                await fetchMyPicks();
+                if (currentUser === 'ADMIN') renderAdminView();
+            }, 1000);
+
+            setTimeout(async () => {
+                await fetchH2H();
+            }, 1500);
+
             setupFilters();
             setInterval(updateCountdowns, 1000);
 
             setInterval(() => {
                 fetchSchedule().then(renderUpcomingMatches);
                 if (currentUser) fetchMyPicks();
-            }, 60000);
+            }, 300000); // Poll less frequently (5 mins) to respect limits
         }
 
         // ─── DATA FETCHING ──────────────────────────
-        async function fetchSchedule() {
+        async function fetchSchedule(ttl = 300000) {
             try {
-                const res = await fetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+                const res = await smartFetch(SCHEDULE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }, ttl);
                 const data = await res.json();
                 scheduleData = (data.record.matches || []).sort((a, b) => new Date(a.startTimeISO) - new Date(b.startTimeISO));
                 precalculateStats();
             } catch (err) { console.error(err); }
         }
 
-        async function fetchMyPicks() {
+        async function fetchLeaderboardCache(ttl = 300000) {
             try {
-                // Fetch from both Main and Archive bins
-                const [resMain, resArchive] = await Promise.all([
-                    fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
-                    fetch(ARCHIVE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
-                ]);
+                const res = await smartFetch(LEADERBOARD_CACHE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }, ttl);
+                if (!res || !res.ok) return;
+                const data = await res.json();
+                if (data.record && data.record.leaderboardData) {
+                    leaderboardData = data.record.leaderboardData;
+                    niceLeaderboardData = data.record.niceLeaderboardData || [];
+                    renderLeaderboard();
+                    renderLeaderboard(true);
+                    console.log('Leaderboard loaded from cache.');
+                    
+                    // Update match counts if stored
+                    if (data.record.matchesCount !== undefined) {
+                        document.getElementById('leaderboardMatchesCount').innerHTML = `Completed<br>Matches: ${data.record.matchesCount}`;
+                        document.getElementById('niceLeaderboardMatchesCount').innerHTML = `Completed<br>Matches: ${data.record.matchesCount}`;
+                    }
+                }
+            } catch (err) {
+                console.warn('Leaderboard cache fetch failed:', err);
+            }
+        }
 
+        async function fetchMyPicks(ttl = 300000) {
+            try {
+                // 1. Fetch Main Bin (Fastest)
+                const resMain = await smartFetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }, ttl);
                 const dataMain = await resMain.json();
-                const dataArchive = await resArchive.json();
-
                 const { picks: picksMain, users } = getNormalizedData(dataMain.record);
-                const { picks: picksArchive } = getNormalizedData(dataArchive.record || {});
 
-                // Combine and de-duplicate picks (preferring main bin if duplicate exists)
+                // 2. Fetch Archive bins with small sequential delays to avoid rate limit bursts
+                let allArchivePicks = [];
+                for (const url of ARCHIVE_BIN_URLS) {
+                    try {
+                        const res = await smartFetch(url, { headers: { 'X-Master-Key': MASTER_KEY } }, ttl);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const { picks } = getNormalizedData(data.record || {});
+                            allArchivePicks = [...allArchivePicks, ...picks];
+                        }
+                        // Minor sleep between requests if not from cache
+                        if (!res.fromCache) await new Promise(r => setTimeout(r, 300));
+                    } catch (e) { console.warn(`Failed to fetch archive ${url}`, e); }
+                }
+
+                // Combine and de-duplicate picks (preferring main bin)
                 const picksMap = new Map();
-                [...picksArchive, ...picksMain].forEach(p => {
+                [...allArchivePicks, ...picksMain].forEach(p => {
                     const key = `${p.userName}|${p.matchId}`;
                     picksMap.set(key, p);
                 });
                 globalAllPicks = Array.from(picksMap.values());
-                globalUsers = users; // Users are strictly in Main Bin for easier login management
+                globalUsers = users; 
                 globalAllPlayers = new Set(globalAllPicks.map(p => p.userName));
 
                 if (currentUser) {
@@ -1512,7 +1670,7 @@
 
         async function fetchH2H() {
             try {
-                const res = await fetch('./h2h.json');
+                const res = await smartFetch('./h2h.json');
                 const data = await res.json();
                 h2hData = data.records || {};
             } catch (err) { console.error(err); }
@@ -2887,7 +3045,14 @@
             const remainingMatches = scheduleData.map((m, idx) => ({ ...m, originalIdx: idx }))
                 .filter(m => {
                     const matchPicks = globalAllPicks.filter(p => p.matchId === m.id);
-                    return !(matchPicks.length > 0 && matchPicks.some(p => p.points !== undefined));
+                    const isRewarded = matchPicks.length > 0 && matchPicks.some(p => p.points !== undefined);
+                    
+                    // Always show if not rewarded
+                    if (!isRewarded) return true;
+                    
+                    // If rewarded, still show if it was in the last 48 hours (to allow fixing errors)
+                    const timeSinceStart = (new Date() - new Date(m.startTimeISO)) / (1000 * 60 * 60);
+                    return timeSinceStart < 48; 
                 });
 
             tbody.innerHTML = remainingMatches.map((m) => {
@@ -2925,7 +3090,7 @@
         }
 
         async function archiveHistoricalPicks() {
-            if (!confirm('This will move all historical picks (for completed and rewarded matches) from the main bin to the archive bin. This helps keep the main bin small. Proceed?')) return;
+            if (!confirm('This will move all historical picks (for completed and rewarded matches) from the main bin to the archives. Proceed?')) return;
 
             const btn = document.getElementById('archiveBtn');
             const originalText = btn.textContent;
@@ -2933,53 +3098,88 @@
             btn.disabled = true;
 
             try {
-                // 1. Fetch latest Main data
-                const mainRes = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-                const mainData = await mainRes.json();
-                let { picks: allMainPicks, users } = getNormalizedData(mainData.record);
+                // 1. Fetch latest Main data and ALL Archive bins
+                const archiveFetches = ARCHIVE_BIN_URLS.map(url => smartFetch(url, { headers: { 'X-Master-Key': MASTER_KEY } }, 0));
+                const [resMain, ...resArchives] = await Promise.all([
+                    smartFetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }, 0),
+                    ...archiveFetches
+                ]);
+                
+                const dataMain = await resMain.json();
+                const archivesData = await Promise.all(resArchives.map(async res => {
+                    if (res.ok) return await res.json();
+                    return { record: { picks: [] } };
+                }));
+
+                let { picks: allMainPicks, users } = getNormalizedData(dataMain.record);
 
                 // 2. Identify picks for matches that are already rewarded (have points)
-                const picksToArchive = allMainPicks.filter(p => p.points !== undefined);
+                const picksToArchive = allMainPicks.filter(p => p.points !== undefined).map(p => {
+                    const { timestamp, ...cleaned } = p;
+                    return cleaned;
+                });
                 const remainingMainPicks = allMainPicks.filter(p => p.points === undefined);
 
                 if (picksToArchive.length === 0) {
-                    alert('No picks found in the main bin that are ready for archiving (only rewarded picks can be archived).');
+                    alert('No picks found in the main bin that are ready for archiving.');
                     return;
                 }
 
-                // 3. Fetch current Archive data
-                const archiveRes = await fetch(ARCHIVE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
-                const archiveData = await archiveRes.json();
-                let { picks: archivePicks } = getNormalizedData(archiveData.record || {});
+                // 3. Find a bin with space
+                let targetBinIdx = -1;
+                let targetBinContent = null;
+                
+                for (let i = 0; i < archivesData.length; i++) {
+                    const binData = archivesData[i].record || { picks: [] };
+                    const currentPicks = binData.picks || [];
+                    const proposedContent = { picks: [...currentPicks, ...picksToArchive] };
+                    const proposedSize = JSON.stringify(proposedContent).length;
+                    
+                    if (proposedSize < 980000) { 
+                        targetBinIdx = i;
+                        targetBinContent = proposedContent;
+                        break;
+                    }
+                }
+
+                if (targetBinIdx === -1) {
+                    throw new Error('All archive bins are full! Please expand the bin list.');
+                }
 
                 // 4. Update Archive Bin
-                const newArchivePicks = [...archivePicks, ...picksToArchive];
-                const saveArchive = await fetch(ARCHIVE_BIN_URL, {
+                const saveArchive = await smartFetch(ARCHIVE_BIN_URLS[targetBinIdx], {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                    body: JSON.stringify({ picks: newArchivePicks })
+                    body: JSON.stringify(targetBinContent)
                 });
 
                 if (!saveArchive.ok) {
                     const err = await saveArchive.text();
-                    alert(`Failed to update archive bin: ${saveArchive.status} ${err}`);
+                    alert(`Failed to update archive bin #${targetBinIdx+1}: ${saveArchive.status} ${err}`);
                     return;
                 }
 
                 // 5. Update Main Bin
-                const saveMain = await fetch(JSONBIN_URL, {
+                const saveMain = await smartFetch(JSONBIN_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
                     body: JSON.stringify({ picks: remainingMainPicks, users: users })
                 });
 
                 if (saveMain.ok) {
-                    globalAllPicks = [...newArchivePicks, ...remainingMainPicks];
+                    // Update global state correctly
+                    let mergedArchivePicks = [];
+                    for(let i=0; i<archivesData.length; i++) {
+                        let picks = (i === targetBinIdx) ? targetBinContent.picks : (archivesData[i].record.picks || []);
+                        mergedArchivePicks = [...mergedArchivePicks, ...picks];
+                    }
+                    globalAllPicks = [...mergedArchivePicks, ...remainingMainPicks];
+                    
                     renderAdminView();
-                    alert(`Archived ${picksToArchive.length} picks successfully! Main bin size reduced.`);
+                    alert(`Archived ${picksToArchive.length} picks successfully to bin #${targetBinIdx+1}!`);
                 } else {
                     const err = await saveMain.text();
-                    alert(`Failed to update main bin: ${saveMain.status} ${err}. Archive was updated, data might be duplicated temporarily.`);
+                    alert(`Failed to update main bin: ${saveMain.status} ${err}.`);
                 }
             } catch (err) {
                 console.error(err);
@@ -3014,7 +3214,7 @@
                     return;
                 }
 
-                const saveSchedule = await fetch(SCHEDULE_BIN_URL, {
+                const saveSchedule = await smartFetch(SCHEDULE_BIN_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
                     body: JSON.stringify({ matches: latestMatches })
@@ -3048,16 +3248,27 @@
             btn.disabled = true;
 
             try {
-                // Fetch both bins
-                const [resMain, resArchive] = await Promise.all([
-                    fetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }),
-                    fetch(ARCHIVE_BIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } })
+                // Fetch Main Bin and ALL Archive bins (Bypass Cache for Admin actions)
+                const archiveFetches = ARCHIVE_BIN_URLS.map(url => smartFetch(url, { headers: { 'X-Master-Key': MASTER_KEY } }, 0));
+                const [resMain, ...resArchives] = await Promise.all([
+                    smartFetch(JSONBIN_URL, { headers: { 'X-Master-Key': MASTER_KEY } }, 0),
+                    ...archiveFetches
                 ]);
+                
                 const dataMain = await resMain.json();
-                const dataArchive = await resArchive.json();
+                const archivesData = await Promise.all(resArchives.map(async res => {
+                    if (res.ok) return await res.json();
+                    return { record: { picks: [] } };
+                }));
 
                 const { picks: picksMain, users } = getNormalizedData(dataMain.record);
-                const { picks: picksArchive } = getNormalizedData(dataArchive.record || {});
+                
+                // Combine all archive picks
+                let allArchivePicksMerged = [];
+                archivesData.forEach(data => {
+                    const { picks } = getNormalizedData(data.record || {});
+                    allArchivePicksMerged = [...allArchivePicksMerged, ...picks];
+                });
 
                 const matchId = match.id;
                 const winner = match.winner;
@@ -3066,19 +3277,19 @@
                 const totalUserCount = userList.length;
                 const totalPool = totalUserCount * 100;
 
-                // Combine and de-duplicate
+                // Combine and de-duplicate (for calculation purposes)
                 const picksMap = new Map();
-                [...picksArchive, ...picksMain].forEach(p => {
+                [...allArchivePicksMerged, ...picksMain].forEach(p => {
                     picksMap.set(`${p.userName}|${p.matchId}`, p);
                 });
-                const allPicks = Array.from(picksMap.values());
+                const allPicksCombined = Array.from(picksMap.values());
 
-                const matchPicks = allPicks.filter(p => p.matchId === matchId && p.userName !== 'ADMIN');
+                const matchPicks = allPicksCombined.filter(p => p.matchId === matchId && p.userName !== 'ADMIN');
                 const correctPicks = matchPicks.filter(p => p.team === winner);
                 const pointsPerWinner = (!isNoResult && correctPicks.length > 0) ? (totalPool / correctPicks.length) : 0;
 
                 const usersWithEntry = new Set();
-                allPicks.forEach(p => {
+                allPicksCombined.forEach(p => {
                     if (p.matchId === matchId) {
                         if (p.userName === 'ADMIN') {
                             p.points = 0;
@@ -3092,10 +3303,9 @@
                     }
                 });
 
-                // Those who missed
                 userList.forEach(u => {
                     if (!usersWithEntry.has(u)) {
-                        allPicks.push({
+                        allPicksCombined.push({
                             userName: u, matchId, team: "Missed",
                             points: isNoResult ? 0 : -100,
                             timestamp: new Date().toISOString()
@@ -3103,31 +3313,74 @@
                     }
                 });
 
-                const archivedPicksForMatch = allPicks.filter(p => p.matchId === matchId);
-                const otherArchivePicks = picksArchive.filter(p => p.matchId !== matchId);
+                // Target match picks (cleaned for archive: No timestamp)
+                const archivedPicksForMatch = allPicksCombined.filter(p => p.matchId === matchId).map(p => {
+                    const { timestamp, ...cleaned } = p;
+                    return cleaned;
+                });
+                
                 const otherMainPicks = picksMain.filter(p => p.matchId !== matchId);
 
-                const finalArchive = [...otherArchivePicks, ...archivedPicksForMatch];
-                const finalMain = otherMainPicks;
+                // SPILLOVER LOGIC: Find a bin for these picks
+                let targetBinIdx = -1;
+                let targetBinContent = null;
+                
+                for (let i = 0; i < archivesData.length; i++) {
+                    const binData = archivesData[i].record || { picks: [] };
+                    const currentPicks = binData.picks || [];
+                    const filteredCurrent = currentPicks.filter(p => p.matchId !== matchId);
+                    const proposedContent = { picks: [...filteredCurrent, ...archivedPicksForMatch] };
+                    const proposedSize = JSON.stringify(proposedContent).length;
+                    
+                    if (proposedSize < 980000) { 
+                        targetBinIdx = i;
+                        targetBinContent = proposedContent;
+                        break;
+                    }
+                }
 
-                const saveArchive = await fetch(ARCHIVE_BIN_URL, {
+                if (targetBinIdx === -1) {
+                    throw new Error('All archive bins are full! Please expand the multi-archive list in the code.');
+                }
+
+                // SAVE ARCHIVE
+                const saveArchive = await smartFetch(ARCHIVE_BIN_URLS[targetBinIdx], {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                    body: JSON.stringify({ picks: finalArchive })
+                    body: JSON.stringify(targetBinContent)
                 });
-                if (!saveArchive.ok) throw new Error('Archive sync failed');
+                if (!saveArchive.ok) throw new Error(`Archive bin #${targetBinIdx+1} sync failed`);
 
-                const saveMain = await fetch(JSONBIN_URL, {
+                // SAVE MAIN
+                const saveMain = await smartFetch(JSONBIN_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                    body: JSON.stringify({ picks: finalMain, users: users })
+                    body: JSON.stringify({ picks: otherMainPicks, users: users })
                 });
-                if (!saveMain.ok) throw new Error('Main sync failed');
+                if (!saveMain.ok) throw new Error('Main bin sync failed');
 
-                globalAllPicks = [...finalArchive, ...finalMain];
+                // UPDATE CACHE
+                globalAllPicks = allPicksCombined;
                 precalculateStats();
+                renderLeaderboard();
+                renderLeaderboard(true);
+
+                const completedCount = scheduleData.filter(m => m.winner !== null && m.winner !== 'No Result').length;
+                const cacheData = {
+                    leaderboardData: leaderboardData,
+                    niceLeaderboardData: niceLeaderboardData,
+                    matchesCount: completedCount,
+                    updatedAt: new Date().toISOString()
+                };
+
+                await smartFetch(LEADERBOARD_CACHE_BIN_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify(cacheData)
+                });
+
                 renderAdminView();
-                alert(`Rewards distributed & archived! Winners: ${correctPicks.length}, Pts/Winner: ${pointsPerWinner.toFixed(2)}`);
+                alert(`Rewards distributed & archived to bin #${targetBinIdx+1}! Winners: ${correctPicks.length}, Pts/Winner: ${pointsPerWinner.toFixed(2)}`);
 
             } catch (e) {
                 console.error(e);
