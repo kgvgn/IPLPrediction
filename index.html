@@ -18,7 +18,7 @@
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         tailwind.config = {
@@ -1302,18 +1302,20 @@
 
             const firstMatchIdxMap = {};
             globalAllPicks.forEach(p => {
-                if (p.userName === 'ADMIN') return;
-                const mIdx = scheduleData.findIndex(m => m.id === p.matchId);
+                const uName = (p.userName || '').toString().trim().toUpperCase();
+                if (!uName || uName === 'ADMIN') return;
+                const mIdClean = (p.matchId || '').toString().trim();
+                const mIdx = scheduleData.findIndex(m => m.id.trim() === mIdClean);
                 if (mIdx !== -1) {
-                    if (firstMatchIdxMap[p.userName] === undefined || mIdx < firstMatchIdxMap[p.userName]) {
-                        firstMatchIdxMap[p.userName] = mIdx;
+                    if (firstMatchIdxMap[uName] === undefined || mIdx < firstMatchIdxMap[uName]) {
+                        firstMatchIdxMap[uName] = mIdx;
                     }
                 }
             });
             memoizedStats.userFirstMatchIdxMap = firstMatchIdxMap;
 
             const niceMatchPointsMap = {};
-            const nicePlayersList = [...new Set(globalAllPicks.map(p => p.userName))].filter(u => u !== 'ADMIN' && NICE_USERS_SET.has(u.toUpperCase()));
+            const nicePlayersList = [...new Set(globalAllPicks.map(p => (p.userName || '').toString().trim().toUpperCase()))].filter(u => u && u !== 'ADMIN' && NICE_USERS_SET.has(u));
 
             memoizedStats.decisiveMatches.forEach(m => {
                 const mIdx = scheduleData.findIndex(sm => sm.id === m.id);
@@ -1555,18 +1557,37 @@
                     globalUsers = normalizedUsers;
                 }
 
-                // 2. Fetch Picks
-                const { data: picksData, error: picksErr } = await supabaseClient.from('picks').select(`*, users!inner(username)`);
-                if (picksErr) throw picksErr;
+                // 2. Fetch ALL Picks (Paginated)
+                let allPicksData = [];
+                let from = 0;
+                let to = 999;
+                let hasMore = true;
+
+                while (hasMore) {
+                    const { data: picksPage, error: picksErr } = await supabaseClient
+                        .from('picks')
+                        .select(`*, users!inner(username)`)
+                        .range(from, to)
+                        .order('created_at', { ascending: true });
+
+                    if (picksErr) throw picksErr;
+                    if (picksPage.length > 0) allPicksData.push(...picksPage);
+                    if (picksPage.length < 1000) hasMore = false;
+                    else {
+                        from += 1000;
+                        to += 1000;
+                    }
+                }
 
                 // Format to match existing JS expectations
-                globalAllPicks = picksData.map(p => ({
-                    matchId: p.match_id,
-                    team: p.team_picked,
-                    userName: p.users.username,
+                globalAllPicks = allPicksData.map(p => ({
+                    matchId: (p.match_id || '').toString().trim(),
+                    team: (p.team_picked || '').toString().trim(),
+                    userName: (p.users.username || '').toString().trim().toUpperCase(),
                     points: parseFloat(p.points || 0),
                     timestamp: p.created_at
                 }));
+                console.log(`[Picks Load] Total picks fetched from Supabase: ${globalAllPicks.length}`);
                 globalAllPlayers = new Set(globalAllPicks.map(p => p.userName));
 
                 if (currentUser) {
@@ -2032,7 +2053,7 @@
                 scrollWrapper.style.width = Math.max(parentWidth, calculatedWidth) + 'px';
             }
 
-            let players = [...new Set(allPicks.map(p => p.userName))].filter(u => u !== 'ADMIN');
+            let players = [...new Set(allPicks.map(p => p.userName.toUpperCase()))].filter(u => u !== 'ADMIN');
             if (isNice) {
                 players = players.filter(u => NICE_USERS.includes(u));
             }
@@ -2738,14 +2759,15 @@
             // 1. Pre-calculate "Arrival Match" for every player to ignore them in older match percentages
             let userPicks = globalAllPicks.filter(p => p.userName !== 'ADMIN');
             if (isNice) {
-                userPicks = userPicks.filter(p => NICE_USERS.includes(p.userName.toUpperCase()));
+                userPicks = userPicks.filter(p => NICE_USERS.includes(p.userName.trim().toUpperCase()));
             }
             const userFirstMatchIdxMap = {};
             userPicks.forEach(p => {
+                const uName = p.userName.toUpperCase();
                 const mIdx = scheduleData.findIndex(m => m.id === p.matchId);
                 if (mIdx !== -1) {
-                    if (userFirstMatchIdxMap[p.userName] === undefined || mIdx < userFirstMatchIdxMap[p.userName]) {
-                        userFirstMatchIdxMap[p.userName] = mIdx;
+                    if (userFirstMatchIdxMap[uName] === undefined || mIdx < userFirstMatchIdxMap[uName]) {
+                        userFirstMatchIdxMap[uName] = mIdx;
                     }
                 }
             });
@@ -2755,7 +2777,19 @@
             let correct = 0, wrong = 0, total = 0;
 
             const allRows = pastMatches.map(m => {
-                const myPick = globalAllPicks.find(p => p.matchId === m.id && p.userName === currentUser);
+                const mIdClean = (m.id || '').toString().trim();
+                const uNameClean = (currentUser || '').toString().trim().toUpperCase();
+
+                const myPick = globalAllPicks.find(p => p.matchId === mIdClean && p.userName === uNameClean);
+
+                // DEBUG LOG: For users to investigate why a match might show "-"
+                if (!myPick && m.winner !== null) {
+                    const matchHasAnyPicks = globalAllPicks.filter(p => p.matchId === mIdClean);
+                    if (matchHasAnyPicks.length > 0) {
+                        console.log(`[Pick Debug] Match ID: ${mIdClean} has ${matchHasAnyPicks.length} total picks in DB, but none for user: "${uNameClean}".`);
+                    }
+                }
+
                 const pickText = myPick ? myPick.team : '-';
                 let statusMsg = '<span class="text-brand-text">Pending</span>';
                 let predPctHtml = '<span class="text-brand-text">—</span>';
