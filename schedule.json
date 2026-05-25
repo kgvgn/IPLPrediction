@@ -629,6 +629,24 @@
             "venue": "Eden Gardens, Kolkata",
             "startTimeISO": "2026-05-24T19:30:00+05:30",
             "winner": null
+        },
+        {
+            "id": "2026-05-26T19:30:00+05:30-Royal_Challengers_Bengaluru-vs-Gujarat_Titans",
+            "dateLabel": "Tue, 26 May '26",
+            "teamA": "Royal Challengers Bengaluru",
+            "teamB": "Gujarat Titans",
+            "venue": "Himachal Pradesh Cricket Association Stadium, Dharamshala",
+            "startTimeISO": "2026-05-26T19:30:00+05:30",
+            "winner": null
+        },
+        {
+            "id": "2026-05-27T19:30:00+05:30-Sunrisers_Hyderabad-vs-Rajasthan_Royals",
+            "dateLabel": "Wed, 27 May '26",
+            "teamA": "Sunrisers Hyderabad",
+            "teamB": "Rajasthan Royals",
+            "venue": "New International Cricket Stadium, New Chandigarh",
+            "startTimeISO": "2026-05-27T19:30:00+05:30",
+            "winner": null
         }
     ]
 }
