@@ -656,6 +656,15 @@
             "venue": "New International Cricket Stadium, New Chandigarh",
             "startTimeISO": "2026-05-29T19:30:00+05:30",
             "winner": null
+        },
+        {
+            "id": "2026-05-31T19:30:00+05:30-Gujarat_Titans-vs-Royal_Challengers_Bangalore",
+            "dateLabel": "Thu, 31 May '26",
+            "teamA": "Gujarat Titans",
+            "teamB": "Royal Challengers Bangalore",
+            "venue": "Narendra Modi Stadium, Ahmedabad",
+            "startTimeISO": "2026-05-31T19:30:00+05:30",
+            "winner": null
         }
     ]
 }
